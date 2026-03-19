@@ -1,16 +1,11 @@
 "use client";
 
+
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import {
-  Check,
-  Crown,
-  HelpCircle,
-  ShieldCheck,
-  Zap,
-} from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { Check, Crown, HelpCircle, ShieldCheck, Zap } from "lucide-react";
+import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 
 type Plan = {
   name: string;
@@ -123,11 +118,13 @@ function PricingCard({
   featured = false,
   onCheckout,
   loadingPlan,
+  isSignedIn,
 }: {
   plan: Plan;
   featured?: boolean;
   onCheckout: (plan: "monthly" | "annual", accepted: boolean) => void;
   loadingPlan: string | null;
+  isSignedIn: boolean;
 }) {
   const isPaidPlan = !!plan.planKey;
   const isLoading = loadingPlan === plan.planKey;
@@ -139,7 +136,7 @@ function PricingCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
       className={cx(
-        "relative rounded-3xl border p-6 shadow-[0_12px_35px_rgba(15,23,42,0.06)]",
+        "relative rounded-3xl border p-6 shadow-sm",
         plan.tone,
         featured ? "scale-[1.01]" : ""
       )}
@@ -230,7 +227,11 @@ function PricingCard({
               plan.buttonTone
             )}
           >
-            {isLoading ? "Redirecting..." : plan.cta}
+            {isLoading
+              ? "Redirecting..."
+              : isSignedIn
+                ? plan.cta
+                : "Sign in to continue"}
           </button>
         </>
       ) : (
@@ -262,6 +263,10 @@ function PricingCard({
 }
 
 export default function PricingPage() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
+  const clerk = useClerk();
+
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [pageError, setPageError] = useState("");
   const hasResumedRef = useRef(false);
@@ -320,39 +325,25 @@ export default function PricingPage() {
       return;
     }
 
+    if (!isLoaded) {
+      setPageError("Authentication is still loading. Please try again.");
+      return;
+    }
+
     try {
       setPageError("");
       setLoadingPlan(plan);
 
-      const supabase = createClient();
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      const user = session?.user ?? null;
-
-      if (!user || !user.email) {
+      if (!isSignedIn || !user?.primaryEmailAddress?.emailAddress) {
         localStorage.setItem("pendingCheckoutPlan", plan);
         localStorage.setItem("pendingCheckoutAccepted", "true");
 
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: {
-            redirectTo: `${window.location.origin}/auth/callback?next=/info/pricing`,
-          },
+        await clerk.redirectToSignIn({
+          signInFallbackRedirectUrl: "/info/pricing",
+          signUpFallbackRedirectUrl: "/info/pricing",
         });
 
-        if (error) {
-          throw new Error(error.message || "Could not start Google sign-in.");
-        }
-
-        if (data.url) {
-          window.location.href = data.url;
-          return;
-        }
-
-        throw new Error("No Google sign-in URL returned.");
+        return;
       }
 
       await recordConsent();
@@ -371,6 +362,8 @@ export default function PricingPage() {
   useEffect(() => {
     async function resumeCheckoutIfNeeded() {
       if (hasResumedRef.current) return;
+      if (!isLoaded) return;
+      if (!isSignedIn) return;
 
       const pendingPlan = localStorage.getItem("pendingCheckoutPlan");
       const pendingAccepted = localStorage.getItem("pendingCheckoutAccepted");
@@ -381,18 +374,6 @@ export default function PricingPage() {
       hasResumedRef.current = true;
 
       try {
-        const supabase = createClient();
-
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        const user = session?.user ?? null;
-
-        if (!user || !user.email) {
-          return;
-        }
-
         localStorage.removeItem("pendingCheckoutPlan");
         localStorage.removeItem("pendingCheckoutAccepted");
 
@@ -413,7 +394,7 @@ export default function PricingPage() {
     }
 
     void resumeCheckoutIfNeeded();
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.10),transparent_24%),linear-gradient(180deg,#f8fafc_0%,#f6f7fb_42%,#f8fafc_100%)] text-slate-900">
@@ -431,7 +412,7 @@ export default function PricingPage() {
           </p>
         </div>
 
-        <div className="mx-auto mt-6 max-w-5xl rounded-[22px] bg-slate-950 px-6 py-5 text-center text-white shadow-[0_18px_40px_rgba(15,23,42,0.16)]">
+        <div className="mx-auto mt-6 max-w-5xl rounded-3xl bg-slate-950 px-6 py-5 text-center text-white shadow-lg">
           <p className="text-sm font-bold uppercase tracking-[0.16em] text-white/85">
             Early Beta Access
           </p>
@@ -453,21 +434,24 @@ export default function PricingPage() {
             plan={plans[0]}
             onCheckout={handleCheckout}
             loadingPlan={loadingPlan}
+            isSignedIn={!!isSignedIn}
           />
           <PricingCard
             plan={plans[1]}
             featured
             onCheckout={handleCheckout}
             loadingPlan={loadingPlan}
+            isSignedIn={!!isSignedIn}
           />
           <PricingCard
             plan={plans[2]}
             onCheckout={handleCheckout}
             loadingPlan={loadingPlan}
+            isSignedIn={!!isSignedIn}
           />
         </div>
 
-        <div className="mx-auto mt-10 max-w-5xl rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
+        <div className="mx-auto mt-10 max-w-5xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-center gap-2 text-center">
             <HelpCircle className="h-5 w-5 text-slate-500" />
             <h2 className="text-2xl font-black tracking-tight text-slate-950">

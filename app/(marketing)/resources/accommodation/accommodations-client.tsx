@@ -1553,6 +1553,7 @@ export default function AccommodationClient({
 }: {
   isPremium: boolean;
 }) {
+  // This must come from a server-side Clerk + subscription check
   const hasAccommodationAccess = isPremium;
 
   const [activeTab, setActiveTab] = useState<MainTab>("browse");
@@ -1660,76 +1661,83 @@ export default function AccommodationClient({
   }, []);
 
   function addCollegeToCompare(college: AccommodationCollege) {
-    setCompareItems((prev) => [
-      ...prev,
-      {
-        id: `${college.id}-${makeId()}`,
-        name: college.name,
-        university: college.university,
-        weeklyPrice: college.weeklyPrice,
-        type: college.type,
-        catered: college.catered,
-        contract: college.contract,
-        distanceToCampus: college.distanceToCampus,
-        vibe: college.vibe,
-        notes: college.summary,
-        website: college.website,
-        source: "dataset",
-      },
-    ]);
-  }
+  if (!hasAccommodationAccess) return;
+
+  setCompareItems((prev) => [
+    ...prev,
+    {
+      id: `${college.id}-${makeId()}`,
+      name: college.name,
+      university: college.university,
+      weeklyPrice: college.weeklyPrice,
+      type: college.type,
+      catered: college.catered,
+      contract: college.contract,
+      distanceToCampus: college.distanceToCampus,
+      vibe: college.vibe,
+      notes: college.summary,
+      website: college.website,
+      source: "dataset",
+    },
+  ]);
+}
 
   function addSelectedCollegeToCompare() {
-    if (!compareSelectId) return;
-    const found = colleges.find((c) => c.id === compareSelectId);
-    if (!found) return;
+  if (!hasAccommodationAccess) return;
+  if (!compareSelectId) return;
 
-    addCollegeToCompare(found);
-    setCompareSelectId("");
-  }
+  const found = colleges.find((c) => c.id === compareSelectId);
+  if (!found) return;
+
+  addCollegeToCompare(found);
+  setCompareSelectId("");
+}
 
   function addCustomCollege() {
-    if (!customCollege.name || !customCollege.university || !customCollege.weeklyPrice) return;
+  if (!hasAccommodationAccess) return;
+  if (!customCollege.name || !customCollege.university || !customCollege.weeklyPrice) return;
 
-    setCompareItems((prev) => [
-      ...prev,
-      {
-        id: `custom-${makeId()}`,
-        name: customCollege.name,
-        university: customCollege.university,
-        weeklyPrice: Number(customCollege.weeklyPrice),
-        type: customCollege.type,
-        catered: customCollege.catered,
-        contract: customCollege.contract || "Custom",
-        distanceToCampus: customCollege.distanceToCampus || "Custom",
-        vibe: customCollege.vibe || "Custom",
-        notes: customCollege.notes,
-        website: "",
-        source: "custom",
-      },
-    ]);
+  setCompareItems((prev) => [
+    ...prev,
+    {
+      id: `custom-${makeId()}`,
+      name: customCollege.name,
+      university: customCollege.university,
+      weeklyPrice: Number(customCollege.weeklyPrice),
+      type: customCollege.type,
+      catered: customCollege.catered,
+      contract: customCollege.contract || "Custom",
+      distanceToCampus: customCollege.distanceToCampus || "Custom",
+      vibe: customCollege.vibe || "Custom",
+      notes: customCollege.notes,
+      website: "",
+      source: "custom",
+    },
+  ]);
 
-    setCustomCollege({
-      name: "",
-      university: "",
-      weeklyPrice: "",
-      type: "Custom Residence",
-      catered: false,
-      contract: "",
-      distanceToCampus: "",
-      vibe: "",
-      notes: "",
-    });
-  }
+  setCustomCollege({
+    name: "",
+    university: "",
+    weeklyPrice: "",
+    type: "Custom Residence",
+    catered: false,
+    contract: "",
+    distanceToCampus: "",
+    vibe: "",
+    notes: "",
+  });
+}
 
   function removeCompareItem(id: string) {
     setCompareItems((prev) => prev.filter((item) => item.id !== id));
   }
 
   function generatePracticeQuestions() {
-    if (!selectedInterviewCollege) return;
-    setGeneratedQuestions(generateQuestions(selectedInterviewCollege));
-  }
+  if (!hasAccommodationAccess) return;
+  if (!selectedInterviewCollege) return;
+
+  setGeneratedQuestions(generateQuestions(selectedInterviewCollege));
+}
   return (
     <main className="min-h-screen bg-[#eef3f8] text-slate-900">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -1823,7 +1831,7 @@ export default function AccommodationClient({
               active={activeTab === "interview"}
               label="Interview Tips"
               icon={MessageSquare}
-              onClick={() => setActiveTab("interview")}
+             onClick={() => setActiveTab("interview")}
             />
           </div>
         </section>
@@ -1832,7 +1840,7 @@ export default function AccommodationClient({
           locked={!hasAccommodationAccess}
           title="Upgrade to unlock Accommodation"
           description="Browse the full accommodation database, compare colleges properly, and practice interview questions with Pro."
-          ctaHref="/upgrade"
+          ctaHref="/info/pricing"
           ctaLabel="Upgrade to Pro"
           previewLabel="Accommodation"
         >
@@ -2601,7 +2609,7 @@ function FeatureGate({
       </div>
 
       {locked ? (
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[2px]">
           <div className="max-w-md rounded-3xl border bg-white p-6 text-center shadow-xl">
             <Lock className="mx-auto mb-3 h-6 w-6" />
             <p className="text-xs uppercase tracking-widest text-slate-500">

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import { hasPremiumAccess } from "@/lib/access";
 import CommandClient from "./command-client";
@@ -16,49 +17,57 @@ const DEFAULT_PROFILE = {
 };
 
 export default async function CommandPage() {
-  const supabase = await createClient();
+  const { userId } = await auth();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/auth/login?next=/tools/command");
+  if (!userId) {
+    redirect("/sign-in?redirect_url=/tools/command");
   }
 
-  const { data: baseProfile } = await supabase
-    .from("profiles")
-    .select("email, full_name, plan")
-    .eq("id", user.id)
+  const clerkUser = await currentUser();
+  const supabase = await createClient();
+
+  const { data: subscription } = await supabase
+    .from("user_subscriptions")
+    .select("plan, subscription_status")
+    .eq("clerk_user_id", userId)
     .maybeSingle();
 
-  const planValue = String(baseProfile?.plan ?? "free").toLowerCase();
+  const planValue = String(subscription?.plan ?? "free").toLowerCase();
   const isPremium =
-    hasPremiumAccess(baseProfile?.plan) ||
-    planValue === "pro" ||
-    planValue === "monthly" ||
-    planValue === "annual" ||
-    planValue === "premium";
+    subscription?.subscription_status === "active" &&
+    (hasPremiumAccess(subscription?.plan) ||
+      planValue === "pro" ||
+      planValue === "monthly" ||
+      planValue === "annual" ||
+      planValue === "premium");
 
   const { data: commandProfile } = await supabase
     .from("command_profiles")
     .select(
       "display_name, year_level, state, category, pathway, atar, ucat, interview_score, target_unis"
     )
-    .eq("user_id", user.id)
+    .eq("clerk_user_id", userId)
     .maybeSingle();
 
   const { data: customEvents } = await supabase
     .from("command_events")
     .select("id, title, date, type, notes, source")
-    .eq("user_id", user.id)
+    .eq("clerk_user_id", userId)
     .order("date", { ascending: true });
+
+  const email =
+    clerkUser?.primaryEmailAddress?.emailAddress ??
+    clerkUser?.emailAddresses?.[0]?.emailAddress ??
+    "";
+
+  const fullName =
+    [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(" ") || "";
 
   const initialProfile = {
     name:
       commandProfile?.display_name ||
-      baseProfile?.full_name ||
-      baseProfile?.email?.split("@")[0] ||
+      fullName ||
+      email.split("@")[0] ||
       DEFAULT_PROFILE.name,
     yearLevel: commandProfile?.year_level || DEFAULT_PROFILE.yearLevel,
     state: commandProfile?.state || DEFAULT_PROFILE.state,
@@ -70,35 +79,35 @@ export default async function CommandPage() {
       commandProfile?.interview_score ?? DEFAULT_PROFILE.interviewScore
     ),
     targetUnis: Array.isArray(commandProfile?.target_unis)
-      ? (commandProfile?.target_unis as string[])
+      ? (commandProfile.target_unis as string[])
       : DEFAULT_PROFILE.targetUnis,
   };
 
   const initialCustomDates: {
-  id: string;
-  title: string;
-  date: string;
-  type: "ucat" | "applications" | "rural" | "interviews" | "offers" | "personal";
-  notes?: string;
-  source: "system" | "custom";
-}[] = (customEvents ?? []).map((event) => ({
-  id: String(event.id),
-  title: event.title,
-  date: String(event.date),
-  type: event.type as
-    | "ucat"
-    | "applications"
-    | "rural"
-    | "interviews"
-    | "offers"
-    | "personal",
-  notes: event.notes ?? "",
-  source: "custom",
-}));
+    id: string;
+    title: string;
+    date: string;
+    type: "ucat" | "applications" | "rural" | "interviews" | "offers" | "personal";
+    notes?: string;
+    source: "system" | "custom";
+  }[] = (customEvents ?? []).map((event) => ({
+    id: String(event.id),
+    title: event.title,
+    date: String(event.date),
+    type: event.type as
+      | "ucat"
+      | "applications"
+      | "rural"
+      | "interviews"
+      | "offers"
+      | "personal",
+    notes: event.notes ?? "",
+    source: "custom",
+  }));
 
   return (
     <CommandClient
-      userId={user.id}
+      userId={userId}
       isPremium={isPremium}
       initialProfile={initialProfile}
       initialCustomDates={initialCustomDates}

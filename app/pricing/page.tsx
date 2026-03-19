@@ -28,7 +28,7 @@ export default function PricingPage() {
           <PricingCard
             planName="Pro Annual"
             priceLabel="$99.99 / year"
-            plan = "annual"
+            plan="annual"
           />
         </div>
       </section>

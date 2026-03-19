@@ -1,26 +1,27 @@
 import { redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import { hasPremiumAccess } from "@/lib/access";
 import OptimiseClient from "./strategy-hub.client";
 
 export default async function StrategyHubPage() {
-  const supabase = await createClient();
+  const { userId } = await auth();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/auth/login?next=/tools/strategy-hub");
+  if (!userId) {
+    redirect("/sign-in?redirect_url=/tools/strategy-hub");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("plan")
-    .eq("id", user.id)
-    .single();
+  const supabase = await createClient();
 
-  const isPremium = hasPremiumAccess(profile?.plan);
+  const { data: subscription } = await supabase
+    .from("user_subscriptions")
+    .select("plan, subscription_status")
+    .eq("clerk_user_id", userId)
+    .maybeSingle();
+
+  const isPremium =
+    subscription?.subscription_status === "active" &&
+    hasPremiumAccess(subscription?.plan);
 
   return <OptimiseClient isPremium={isPremium} />;
 }

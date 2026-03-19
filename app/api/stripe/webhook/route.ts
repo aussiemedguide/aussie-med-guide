@@ -1,72 +1,170 @@
+import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { headers } from "next/headers";
-import { stripe } from "@/lib/stripe";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
+
+export const runtime = "nodejs";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+async function upsertSubscriptionRecord(params: {
+  clerkUserId: string;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+  subscriptionStatus: string;
+  plan: string;
+  currentPeriodEnd?: string | null;
+}) {
+  const {
+    clerkUserId,
+    stripeCustomerId,
+    stripeSubscriptionId,
+    subscriptionStatus,
+    plan,
+    currentPeriodEnd,
+  } = params;
+
+  const { error } = await supabase.from("user_subscriptions").upsert(
+    {
+      clerk_user_id: clerkUserId,
+      stripe_customer_id: stripeCustomerId ?? null,
+      stripe_subscription_id: stripeSubscriptionId ?? null,
+      subscription_status: subscriptionStatus,
+      plan,
+      current_period_end: currentPeriodEnd ?? null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "clerk_user_id" }
+  );
+
+  if (error) {
+    throw error;
+  }
+}
+
+function getPlanFromPriceId(priceId?: string | null) {
+  if (!priceId) return "free";
+  if (priceId === process.env.STRIPE_PRO_MONTHLY) return "monthly";
+  if (priceId === process.env.STRIPE_PRO_ANNUAL) return "annual";
+  return "unknown";
+}
 
 export async function POST(req: Request) {
-  const body = await req.text();
-  const signature = (await headers()).get("stripe-signature");
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    return NextResponse.json(
+      { error: "Missing STRIPE_WEBHOOK_SECRET" },
+      { status: 500 }
+    );
+  }
+
+  const signature = req.headers.get("stripe-signature");
 
   if (!signature) {
-    return new Response("Missing stripe signature", { status: 400 });
+    return NextResponse.json(
+      { error: "Missing Stripe signature" },
+      { status: 400 }
+    );
   }
 
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    );
+    const body = await req.text();
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (error) {
-    console.error("Webhook verification failed:", error);
-    return new Response("Webhook Error", { status: 400 });
+    console.error("Webhook signature verification failed:", error);
+    return NextResponse.json(
+      { error: "Invalid webhook signature" },
+      { status: 400 }
+    );
   }
-
-  const supabase = await createClient();
 
   try {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
-        const userId = session.metadata?.supabase_user_id;
-        const customerId = session.customer as string | null;
-        const subscriptionId = session.subscription as string | null;
+        const clerkUserId = session.metadata?.clerk_user_id ?? null;
+        const stripeCustomerId =
+          typeof session.customer === "string" ? session.customer : null;
+        const stripeSubscriptionId =
+          typeof session.subscription === "string" ? session.subscription : null;
+        const plan = session.metadata?.plan ?? "free";
 
-        if (userId) {
-          await supabase
-            .from("profiles")
-            .update({
-              stripe_customer_id: customerId,
-              stripe_subscription_id: subscriptionId,
-              plan: "active",
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", userId);
+        if (clerkUserId) {
+          await upsertSubscriptionRecord({
+            clerkUserId,
+            stripeCustomerId,
+            stripeSubscriptionId,
+            subscriptionStatus: "active",
+            plan,
+            currentPeriodEnd: null,
+          });
         }
 
         break;
       }
 
       case "customer.subscription.created":
-      case "customer.subscription.updated":
+      case "customer.subscription.updated": {
+        const subscription = event.data.object as Stripe.Subscription;
+
+        const clerkUserId = subscription.metadata?.clerk_user_id ?? null;
+        const stripeCustomerId =
+          typeof subscription.customer === "string" ? subscription.customer : null;
+
+        const priceId = subscription.items.data[0]?.price?.id ?? null;
+        const plan = subscription.metadata?.plan || getPlanFromPriceId(priceId);
+
+        let currentPeriodEnd: string | null = null;
+
+        const subWithPeriod = subscription as Stripe.Subscription & {
+          current_period_end?: number;
+        };
+
+        if (subWithPeriod.current_period_end) {
+          currentPeriodEnd = new Date(
+            subWithPeriod.current_period_end * 1000
+          ).toISOString();
+        }
+
+        if (clerkUserId) {
+          await upsertSubscriptionRecord({
+            clerkUserId,
+            stripeCustomerId,
+            stripeSubscriptionId: subscription.id,
+            subscriptionStatus: subscription.status,
+            plan,
+            currentPeriodEnd,
+          });
+        }
+
+        break;
+      }
+
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
 
-        const customerId = subscription.customer as string;
-        const priceId = subscription.items.data[0]?.price?.id ?? null;
+        const clerkUserId = subscription.metadata?.clerk_user_id ?? null;
+        const stripeCustomerId =
+          typeof subscription.customer === "string" ? subscription.customer : null;
 
-        await supabase
-          .from("profiles")
-          .update({
-            stripe_subscription_id: subscription.id,
-            plan: subscription.status,
-            subscription_price_id: priceId,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("stripe_customer_id", customerId);
+        if (clerkUserId) {
+          await upsertSubscriptionRecord({
+            clerkUserId,
+            stripeCustomerId,
+            stripeSubscriptionId: subscription.id,
+            subscriptionStatus: "canceled",
+            plan: "free",
+            currentPeriodEnd: null,
+          });
+        }
 
         break;
       }
@@ -75,9 +173,12 @@ export async function POST(req: Request) {
         break;
     }
 
-    return new Response("ok", { status: 200 });
+    return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("Webhook handler failed:", error);
-    return new Response("Webhook handler failed", { status: 500 });
+    console.error("Webhook handler error:", error);
+    return NextResponse.json(
+      { error: "Webhook handler failed" },
+      { status: 500 }
+    );
   }
 }

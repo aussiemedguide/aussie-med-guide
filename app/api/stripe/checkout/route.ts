@@ -1,86 +1,158 @@
 import { NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
-import { createClient } from "@/lib/supabase/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
+import Stripe from "stripe";
+import { createClient } from "@supabase/supabase-js";
+
+export const runtime = "nodejs";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+type CheckoutRequestBody = {
+  plan: "monthly" | "annual";
+};
+
+function getBaseUrl(req: Request) {
+  const origin = req.headers.get("origin");
+  if (origin) return origin;
+  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+}
 
 export async function POST(req: Request) {
   try {
-    const { plan } = await req.json();
+    const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = (await req.json()) as CheckoutRequestBody;
+    const plan = body?.plan;
+
+    if (plan !== "monthly" && plan !== "annual") {
+      return NextResponse.json(
+        { error: "Invalid plan. Must be 'monthly' or 'annual'." },
+        { status: 400 }
+      );
+    }
+
+    const user = await currentUser();
+    const email = user?.primaryEmailAddress?.emailAddress ?? undefined;
 
     const priceId =
-      plan === "annual"
-        ? process.env.STRIPE_PRICE_ANNUAL
-        : process.env.STRIPE_PRICE_MONTHLY;
+      plan === "monthly"
+        ? process.env.STRIPE_PRO_MONTHLY
+        : process.env.STRIPE_PRO_ANNUAL;
 
     if (!priceId) {
       return NextResponse.json(
-        { error: "Missing Stripe price ID" },
+        { error: "Missing Stripe price ID in environment variables." },
         { status: 500 }
       );
     }
 
-    const supabase = await createClient();
+    const { data: existingSub, error: existingSubError } = await supabase
+      .from("user_subscriptions")
+      .select("stripe_customer_id")
+      .eq("clerk_user_id", userId)
+      .maybeSingle();
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
+    if (existingSubError) {
+      console.error("Supabase read error:", existingSubError);
       return NextResponse.json(
-        { error: "You must be logged in first" },
-        { status: 401 }
+        { error: "Failed to load subscription record." },
+        { status: 500 }
       );
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("stripe_customer_id")
-      .eq("id", user.id)
-      .maybeSingle();
+    let stripeCustomerId = existingSub?.stripe_customer_id ?? null;
 
-    let customerId = profile?.stripe_customer_id ?? null;
+if (stripeCustomerId) {
+  try {
+    await stripe.customers.retrieve(stripeCustomerId);
+  } catch {
+    stripeCustomerId = null;
+  }
+}
 
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email ?? undefined,
-        metadata: {
-          supabase_user_id: user.id,
-        },
-      });
+if (!stripeCustomerId) {
+  const customer = await stripe.customers.create({
+    email,
+    metadata: {
+      clerk_user_id: userId,
+    },
+  });
 
-      customerId = customer.id;
+  stripeCustomerId = customer.id;
 
-      await supabase.from("profiles").upsert({
-        id: user.id,
-        email: user.email,
-        stripe_customer_id: customerId,
-        updated_at: new Date().toISOString(),
-      });
-    }
+  const { error: upsertError } = await supabase
+    .from("user_subscriptions")
+    .upsert(
+      {
+        clerk_user_id: userId,
+        stripe_customer_id: stripeCustomerId,
+        stripe_subscription_id: null,
+        subscription_status: "inactive",
+        plan: "free",
+      },
+      { onConflict: "clerk_user_id" }
+    );
+
+  if (upsertError) {
+    console.error("Supabase upsert error:", upsertError);
+    return NextResponse.json(
+      { error: "Failed to save customer record." },
+      { status: 500 }
+    );
+  }
+}
+
+    const baseUrl = getBaseUrl(req);
+
+    console.log("plan:", plan);
+    console.log("priceId:", priceId);
+    console.log("baseUrl:", baseUrl);
+    console.log("userId:", userId);
+    console.log("email:", email);
+    console.log("stripeCustomerId:", stripeCustomerId);
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
-      customer: customerId,
+      customer: stripeCustomerId,
       line_items: [
         {
           price: priceId,
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
+      success_url: `${baseUrl}/info/pricing?success=true`,
+      cancel_url: `${baseUrl}/info/pricing?canceled=true`,
       allow_promotion_codes: true,
+      billing_address_collection: "auto",
       metadata: {
-        supabase_user_id: user.id,
+        clerk_user_id: userId,
         plan,
+      },
+      subscription_data: {
+        metadata: {
+          clerk_user_id: userId,
+          plan,
+        },
       },
     });
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
     console.error("Stripe checkout error:", error);
+
     return NextResponse.json(
-      { error: "Failed to create checkout session" },
+      {
+        error: error instanceof Error ? error.message : "Unknown checkout error",
+      },
       { status: 500 }
     );
   }

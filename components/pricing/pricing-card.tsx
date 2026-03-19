@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
+import { Show, SignUpButton, useAuth } from "@clerk/nextjs";
 
 type PlanKey = "monthly" | "annual";
 
@@ -19,36 +19,10 @@ export function PricingCard({
   priceLabel,
   plan,
 }: PricingCardProps) {
+  const { isSignedIn, getToken } = useAuth();
   const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const hasAutoResumed = useRef(false);
-
-  async function startGoogleSignIn() {
-    const supabase = createClient();
-
-    localStorage.setItem("pendingCheckoutPlan", plan);
-    localStorage.setItem("pendingCheckoutPlanName", planName);
-    localStorage.setItem("pendingCheckoutAccepted", accepted ? "true" : "false");
-
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    if (error) {
-      throw new Error(error.message || "Could not start Google sign-in.");
-    }
-
-    if (data.url) {
-      window.location.href = data.url;
-      return;
-    }
-
-    throw new Error("No Google sign-in URL was returned.");
-  }
 
   async function recordConsent() {
     const consentResponse = await fetch("/api/legal-consent", {
@@ -73,10 +47,13 @@ export function PricingCard({
   }
 
   async function createCheckoutSession() {
+    const token = await getToken();
+
     const response = await fetch("/api/stripe/checkout", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ plan }),
     });
@@ -93,9 +70,14 @@ export function PricingCard({
     window.location.href = data.url;
   }
 
-  async function handleCheckout() {
+  async function handleSignedInCheckout() {
     if (!accepted) {
       setError("Please accept the legal terms before continuing.");
+      return;
+    }
+
+    if (!isSignedIn) {
+      setError("Please create an account before continuing.");
       return;
     }
 
@@ -103,19 +85,6 @@ export function PricingCard({
     setError("");
 
     try {
-      const supabase = createClient();
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      const user = session?.user ?? null;
-
-      if (!user || !user.email) {
-        await startGoogleSignIn();
-        return;
-      }
-
       await recordConsent();
       await createCheckoutSession();
     } catch (err) {
@@ -125,52 +94,6 @@ export function PricingCard({
       setLoading(false);
     }
   }
-
-  useEffect(() => {
-    async function resumePendingCheckout() {
-      if (hasAutoResumed.current) return;
-
-      const pendingPlan = localStorage.getItem("pendingCheckoutPlan");
-      const pendingAccepted = localStorage.getItem("pendingCheckoutAccepted");
-
-      if (pendingPlan !== plan) return;
-      if (pendingAccepted !== "true") return;
-
-      hasAutoResumed.current = true;
-      setAccepted(true);
-      setLoading(true);
-      setError("");
-
-      try {
-        const supabase = createClient();
-
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        const user = session?.user ?? null;
-
-        if (!user || !user.email) {
-          setLoading(false);
-          return;
-        }
-
-        localStorage.removeItem("pendingCheckoutPlan");
-        localStorage.removeItem("pendingCheckoutPlanName");
-        localStorage.removeItem("pendingCheckoutAccepted");
-
-        await recordConsent();
-        await createCheckoutSession();
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Something went wrong.";
-        setError(message);
-        setLoading(false);
-      }
-    }
-
-    void resumePendingCheckout();
-  }, [plan]);
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -235,14 +158,33 @@ export function PricingCard({
         <p className="mt-3 text-sm font-medium text-red-600">{error}</p>
       ) : null}
 
-      <button
-        type="button"
-        onClick={handleCheckout}
-        disabled={!accepted || loading}
-        className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {loading ? "Starting checkout..." : "Continue to payment"}
-      </button>
+      <div className="mt-5">
+        <Show when="signed-out">
+          <SignUpButton
+            mode="modal"
+            forceRedirectUrl={`/pricing?plan=${plan}&accepted=true`}
+          >
+            <button
+              type="button"
+              disabled={!accepted}
+              className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Continue to payment
+            </button>
+          </SignUpButton>
+        </Show>
+
+        <Show when="signed-in">
+          <button
+            type="button"
+            onClick={handleSignedInCheckout}
+            disabled={!accepted || loading}
+            className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Starting checkout..." : "Continue to payment"}
+          </button>
+        </Show>
+      </div>
     </div>
   );
 }
