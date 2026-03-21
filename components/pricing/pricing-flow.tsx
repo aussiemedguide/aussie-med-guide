@@ -333,7 +333,7 @@ export function PricingFlow({ isSignedIn, userEmail }: PricingFlowProps) {
             </p>
 
             <div className="mt-4">
-              <SignInButton mode="modal" forceRedirectUrl="/pricing">
+              <SignInButton mode="modal" forceRedirectUrl="/info/pricing">
                 <button
                   type="button"
                   className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white"

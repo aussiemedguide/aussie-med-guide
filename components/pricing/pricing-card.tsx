@@ -162,7 +162,7 @@ export function PricingCard({
         <Show when="signed-out">
           <SignUpButton
             mode="modal"
-            forceRedirectUrl={`/pricing?plan=${plan}&accepted=true`}
+            forceRedirectUrl={`/info/pricing?plan=${plan}&accepted=true`}
           >
             <button
               type="button"

@@ -550,7 +550,7 @@ function ProCard({
           stay available on the free plan.
         </p>
         <Link
-          href="/pricing"
+          href="/info/pricing"
           className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
         >
           Upgrade to Pro
@@ -882,7 +882,7 @@ export default function CommandClient({
 
                 {subscription.planKey === "free" ? (
                   <Link
-                    href="/pricing"
+                    href="/info/pricing"
                     className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-slate-900/30 px-4 py-2.5 text-sm font-semibold text-white"
                   >
                     <Crown className="h-4 w-4" />
@@ -890,7 +890,7 @@ export default function CommandClient({
                   </Link>
                 ) : (
                   <Link
-                    href="/pricing"
+                    href="/info/pricing"
                     className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-slate-900/30 px-4 py-2.5 text-sm font-semibold text-white"
                   >
                     <Crown className="h-4 w-4" />
