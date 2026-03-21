@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Show, SignUpButton, useAuth } from "@clerk/nextjs";
 
-type PlanKey = "monthly" | "annual";
+type PlanKey = "oro_monthly" | "pro_annual";
 
 type PricingCardProps = {
   planName: string;

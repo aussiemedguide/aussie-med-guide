@@ -1,17 +1,12 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-const isPaidRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/train(.*)",
-  "/interview(.*)",
-  "/compare(.*)",
-  "/profile(.*)",
-  "/pricing(.*)",
+const isProtectedRoute = createRouteMatcher([
   "/resources(.*)",
+  "/tools(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  if (isPaidRoute(req)) {
+  if (isProtectedRoute(req)) {
     await auth.protect();
   }
 });
