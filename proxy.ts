@@ -6,6 +6,8 @@ const isPaidRoute = createRouteMatcher([
   "/interview(.*)",
   "/compare(.*)",
   "/profile(.*)",
+  "/pricing(.*)",
+  "/resources(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

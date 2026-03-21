@@ -109,6 +109,24 @@ type EvaluatedUniversity = UniversityRule & {
   limitingFactor: string;
 };
 
+type PreferenceGoal = "safe" | "normal" | "aggressive";
+
+type InsightsRun = {
+  strong: EvaluatedUniversity[];
+  competitive: EvaluatedUniversity[];
+  possible: EvaluatedUniversity[];
+  unlikely: EvaluatedUniversity[];
+};
+
+type StrategyMeta = {
+  strong: number;
+  competitive: number;
+  possible: number;
+  unlikely: number;
+  selectedIncluded: number;
+  averageScore: number;
+};
+
 const TAB_ORDER: { key: TabKey; label: string; icon: typeof Compass }[] = [
   { key: "bonded", label: "Bonded", icon: HeartHandshake },
   { key: "preference", label: "Preference", icon: Target },
@@ -461,24 +479,16 @@ const UNIVERSITY_RULES: UniversityRule[] = [
   },
 ];
 
-  type PreferenceGoal = "safe" | "balanced" | "aggressive";
-type InsightsRun = {
-  strong: EvaluatedUniversity[];
-  competitive: EvaluatedUniversity[];
-  possible: EvaluatedUniversity[];
-  unlikely: EvaluatedUniversity[];
-};
-
 const PREFERENCE_GOAL_LABEL: Record<PreferenceGoal, string> = {
   safe: "Safe",
-  balanced: "Balanced",
+  normal: "Normal",
   aggressive: "Aggressive",
 };
 
 const PREFERENCE_GOAL_COPY: Record<PreferenceGoal, string> = {
-  safe: "Maximises probability of receiving an offer.",
-  balanced: "Mix of realistic targets and selective reaches.",
-  aggressive: "Higher upside, higher risk of missing out.",
+  safe: "Maximises probability of receiving an offer within this TAC.",
+  normal: "Best overall mix of reach, realism, and backup options within this TAC.",
+  aggressive: "Higher upside ordering within this TAC, with more ambitious reaches near the top.",
 };
 
 const TAC_OPTIONS: TacSystem[] = ["QTAC", "UAC", "VTAC", "TISC", "SATAC", "Direct"];
@@ -670,88 +680,155 @@ function evaluateUniversity(rule: UniversityRule, profile: Profile): EvaluatedUn
   };
 }
 
-function scorePreferences(
-  list: EvaluatedUniversity[],
-  profile: Profile,
-  selectedTac: TacSystem,
-  goal: PreferenceGoal,
-  selectedTargets: UniKey[],
-) {
-  const scope = list.filter((u) => u.tac === selectedTac && selectedTargets.includes(u.key));
-
-  const sorted = [...scope].sort((a, b) => {
-    const wantA = selectedTargets.includes(a.key) ? 1 : 0;
-    const wantB = selectedTargets.includes(b.key) ? 1 : 0;
-
-    const prestigeA = a.baseline.atar + a.baseline.ucat / 1000;
-    const prestigeB = b.baseline.atar + b.baseline.ucat / 1000;
-
-    if (goal === "safe") {
-      if (a.band !== b.band) return bandOrder(b.band) - bandOrder(a.band);
-      if (a.score !== b.score) return b.score - a.score;
-      return wantB - wantA;
-    }
-
-    if (goal === "aggressive") {
-      if (wantA !== wantB) return wantB - wantA;
-      if (prestigeA !== prestigeB) return prestigeB - prestigeA;
-      return b.score - a.score;
-    }
-
-    if (a.band !== b.band) return bandOrder(b.band) - bandOrder(a.band);
-    if (wantA !== wantB) return wantB - wantA;
-    const distanceA = Math.abs(a.score - 0.69);
-    const distanceB = Math.abs(b.score - 0.69);
-    return distanceA - distanceB || prestigeB - prestigeA;
-  });
-
-  return sorted;
-}
-
-function buildPreferenceStrategies(
-  list: EvaluatedUniversity[],
-  selectedTac: TacSystem,
-  selectedTargets: UniKey[],
-) {
-  const safe = scorePreferences(list, {
-    atar: 99,
-    ucat: 2900,
-    status: "metropolitan",
-    interview: "average",
-    bonded: "open",
-    riskTolerance: 0,
-    preferences: selectedTargets,
-  }, selectedTac, "safe", selectedTargets);
-
-  const balanced = scorePreferences(list, {
-    atar: 99,
-    ucat: 2900,
-    status: "metropolitan",
-    interview: "average",
-    bonded: "open",
-    riskTolerance: 2,
-    preferences: selectedTargets,
-  }, selectedTac, "balanced", selectedTargets);
-
-  const aggressive = scorePreferences(list, {
-    atar: 99,
-    ucat: 2900,
-    status: "metropolitan",
-    interview: "average",
-    bonded: "open",
-    riskTolerance: 4,
-    preferences: selectedTargets,
-  }, selectedTac, "aggressive", selectedTargets);
-
-  return { safe, balanced, aggressive };
-}
-
 function buildInsightsRun(list: EvaluatedUniversity[]): InsightsRun {
   return {
     strong: list.filter((u) => u.band === "strong").sort((a, b) => b.score - a.score),
     competitive: list.filter((u) => u.band === "competitive").sort((a, b) => b.score - a.score),
     possible: list.filter((u) => u.band === "possible").sort((a, b) => b.score - a.score),
     unlikely: list.filter((u) => u.band === "unlikely").sort((a, b) => b.score - a.score),
+  };
+}
+
+function getTacScopedUniversities(list: EvaluatedUniversity[], selectedTac: TacSystem) {
+  return list.filter((u) => u.tac === selectedTac);
+}
+
+function getPrestigeValue(uni: EvaluatedUniversity) {
+  return uni.baseline.atar + uni.baseline.ucat / 1000 + (uni.directEntryLike ? 0.18 : 0) + (uni.state === "NSW" || uni.state === "QLD" || uni.state === "VIC" ? 0.04 : 0);
+}
+
+function getSelectionBoost(uni: EvaluatedUniversity, selectedTargets: UniKey[]) {
+  return selectedTargets.includes(uni.key) ? 0.035 : 0;
+}
+
+function getSafetyPenalty(uni: EvaluatedUniversity) {
+  if (uni.band === "unlikely") return 0.22;
+  if (uni.band === "possible") return 0.08;
+  return 0;
+}
+
+function getAggressiveUpside(uni: EvaluatedUniversity) {
+  const prestige = getPrestigeValue(uni) / 120;
+  const reachBonus = uni.band === "competitive" ? 0.08 : uni.band === "possible" ? 0.12 : uni.band === "strong" ? 0.02 : -0.14;
+  return prestige + reachBonus;
+}
+
+function rankUniversitiesForGoal(
+  list: EvaluatedUniversity[],
+  goal: PreferenceGoal,
+  selectedTargets: UniKey[],
+) {
+  return [...list].sort((a, b) => {
+    const aSelectedBoost = getSelectionBoost(a, selectedTargets);
+    const bSelectedBoost = getSelectionBoost(b, selectedTargets);
+
+    const aPrestige = getPrestigeValue(a);
+    const bPrestige = getPrestigeValue(b);
+
+    const aSafeValue = a.score - getSafetyPenalty(a) + aSelectedBoost;
+    const bSafeValue = b.score - getSafetyPenalty(b) + bSelectedBoost;
+
+    const aNormalValue =
+      a.score +
+      aSelectedBoost +
+      (a.band === "competitive" ? 0.06 : 0) +
+      (a.band === "strong" ? 0.04 : 0) +
+      (a.band === "possible" ? 0.01 : -0.18) +
+      (a.missionHeavy || a.portfolioHeavy ? 0.01 : 0);
+
+    const bNormalValue =
+      b.score +
+      bSelectedBoost +
+      (b.band === "competitive" ? 0.06 : 0) +
+      (b.band === "strong" ? 0.04 : 0) +
+      (b.band === "possible" ? 0.01 : -0.18) +
+      (b.missionHeavy || b.portfolioHeavy ? 0.01 : 0);
+
+    const aAggressiveValue = a.score * 0.68 + getAggressiveUpside(a) + aSelectedBoost;
+    const bAggressiveValue = b.score * 0.68 + getAggressiveUpside(b) + bSelectedBoost;
+
+    if (goal === "safe") {
+      if (aSafeValue !== bSafeValue) return bSafeValue - aSafeValue;
+      if (bandOrder(a.band) !== bandOrder(b.band)) return bandOrder(b.band) - bandOrder(a.band);
+      return b.score - a.score;
+    }
+
+    if (goal === "normal") {
+      if (aNormalValue !== bNormalValue) return bNormalValue - aNormalValue;
+      if (bandOrder(a.band) !== bandOrder(b.band)) return bandOrder(b.band) - bandOrder(a.band);
+      return b.score - a.score;
+    }
+
+    if (aAggressiveValue !== bAggressiveValue) return bAggressiveValue - aAggressiveValue;
+    if (aPrestige !== bPrestige) return bPrestige - aPrestige;
+    return b.score - a.score;
+  });
+}
+
+function composePreferenceList(
+  tacScoped: EvaluatedUniversity[],
+  goal: PreferenceGoal,
+  selectedTargets: UniKey[],
+) {
+  const ranked = rankUniversitiesForGoal(tacScoped, goal, selectedTargets);
+
+  if (goal === "safe") {
+    const strong = ranked.filter((u) => u.band === "strong");
+    const competitive = ranked.filter((u) => u.band === "competitive");
+    const possible = ranked.filter((u) => u.band === "possible");
+    const unlikely = ranked.filter((u) => u.band === "unlikely");
+    return [...strong, ...competitive, ...possible, ...unlikely];
+  }
+
+  if (goal === "normal") {
+    const strong = ranked.filter((u) => u.band === "strong");
+    const competitive = ranked.filter((u) => u.band === "competitive");
+    const possible = ranked.filter((u) => u.band === "possible");
+    const unlikely = ranked.filter((u) => u.band === "unlikely");
+
+    const mixed: EvaluatedUniversity[] = [];
+    const used = new Set<UniKey>();
+
+    const pushUnique = (uni?: EvaluatedUniversity) => {
+      if (!uni || used.has(uni.key)) return;
+      used.add(uni.key);
+      mixed.push(uni);
+    };
+
+    competitive.slice(0, 2).forEach(pushUnique);
+    strong.slice(0, 2).forEach(pushUnique);
+    possible.slice(0, 1).forEach(pushUnique);
+
+    [...ranked].forEach(pushUnique);
+    unlikely.forEach(pushUnique);
+
+    return mixed;
+  }
+
+  const viable = ranked.filter((u) => u.band !== "unlikely");
+  const unlikely = ranked.filter((u) => u.band === "unlikely");
+  return [...viable, ...unlikely];
+}
+
+function scorePreferences(
+  list: EvaluatedUniversity[],
+  selectedTac: TacSystem,
+  goal: PreferenceGoal,
+  selectedTargets: UniKey[],
+) {
+  const tacScoped = getTacScopedUniversities(list, selectedTac);
+  return composePreferenceList(tacScoped, goal, selectedTargets);
+}
+
+function getStrategyMeta(items: EvaluatedUniversity[], selectedTargets: UniKey[]): StrategyMeta {
+  return {
+    strong: items.filter((u) => u.band === "strong").length,
+    competitive: items.filter((u) => u.band === "competitive").length,
+    possible: items.filter((u) => u.band === "possible").length,
+    unlikely: items.filter((u) => u.band === "unlikely").length,
+    selectedIncluded: items.filter((u) => selectedTargets.includes(u.key)).length,
+    averageScore:
+      items.reduce((sum, u) => sum + u.score, 0) / Math.max(1, items.length),
   };
 }
 
@@ -947,16 +1024,54 @@ function UniversityInsightCard({ uni }: { uni: EvaluatedUniversity }) {
   );
 }
 
+function StrategySummaryStrip({
+  meta,
+  tone,
+}: {
+  meta: StrategyMeta;
+  tone: "rose" | "blue" | "emerald";
+}) {
+  const wrapper =
+    tone === "rose"
+      ? "border-rose-200 bg-rose-100/80"
+      : tone === "blue"
+        ? "border-blue-200 bg-blue-100/80"
+        : "border-emerald-200 bg-emerald-100/80";
+
+  return (
+    <div className={cn("mt-4 grid grid-cols-2 gap-2 rounded-2xl border p-3 text-sm sm:grid-cols-4", wrapper)}>
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Strong + Competitive</div>
+        <div className="mt-1 font-black text-slate-950">{meta.strong + meta.competitive}</div>
+      </div>
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Possible</div>
+        <div className="mt-1 font-black text-slate-950">{meta.possible}</div>
+      </div>
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Selected Included</div>
+        <div className="mt-1 font-black text-slate-950">{meta.selectedIncluded}</div>
+      </div>
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Avg Score</div>
+        <div className="mt-1 font-black text-slate-950">{safeRound(meta.averageScore * 100, 0)}%</div>
+      </div>
+    </div>
+  );
+}
+
 function PreferenceCard({
   tone,
   title,
   subtitle,
   items,
+  selectedTargets,
 }: {
   tone: "rose" | "blue" | "emerald";
   title: string;
   subtitle: string;
   items: EvaluatedUniversity[];
+  selectedTargets: UniKey[];
 }) {
   const wrapper =
     tone === "rose"
@@ -972,6 +1087,8 @@ function PreferenceCard({
         ? "bg-blue-100 text-blue-900"
         : "bg-emerald-100 text-emerald-900";
 
+  const meta = getStrategyMeta(items, selectedTargets);
+
   return (
     <div className={cn("rounded-3xl border p-5 shadow-sm", wrapper)}>
       <div className="flex items-center gap-2">
@@ -980,37 +1097,54 @@ function PreferenceCard({
       </div>
       <p className="mt-2 text-sm text-slate-600">{subtitle}</p>
 
+      <StrategySummaryStrip meta={meta} tone={tone} />
+
       <div className="mt-5 space-y-3">
-        {items.slice(0, 6).map((uni, index) => (
-          <div key={uni.key} className="flex items-center justify-between rounded-2xl border border-white/70 bg-white/80 px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700">
-                {index + 1}
+        {items.slice(0, 6).map((uni, index) => {
+          const isSelected = selectedTargets.includes(uni.key);
+
+          return (
+            <div
+              key={uni.key}
+              className={cn(
+                "flex items-center justify-between rounded-2xl border px-4 py-3",
+                isSelected
+                  ? "border-violet-200 bg-violet-50/80"
+                  : "border-white/70 bg-white/80"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700">
+                  {index + 1}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="font-semibold text-slate-950">{uni.name}</div>
+                    {isSelected ? <Pill tone="violet">Selected</Pill> : null}
+                  </div>
+                  <div className="text-xs text-slate-500">{uni.tac} · {bandLabel(uni.band)}</div>
+                </div>
               </div>
-              <div>
-                <div className="font-semibold text-slate-950">{uni.name}</div>
-                <div className="text-xs text-slate-500">{uni.tac} · {bandLabel(uni.band)}</div>
-              </div>
+              <Pill tone={uni.band === "strong" ? "emerald" : uni.band === "competitive" ? "blue" : uni.band === "possible" ? "amber" : "rose"}>
+                {bandLabel(uni.band)}
+              </Pill>
             </div>
-            <Pill tone={uni.band === "strong" ? "emerald" : uni.band === "competitive" ? "blue" : uni.band === "possible" ? "amber" : "rose"}>
-              {bandLabel(uni.band)}
-            </Pill>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className={cn("mt-4 rounded-2xl px-4 py-3 text-sm font-medium", footer)}>
         Strategy: {title === "Aggressive"
-          ? "Prioritises reach and prestige. Risk of missing out if execution slips."
-          : title === "Balanced"
-            ? "Balances reach with safety. Usually the smartest default."
-            : "Prioritises attainable targets to maximise offer probability."}
+          ? "Pushes higher-upside TAC-specific reaches upward, while still keeping weaker options below viable ones."
+          : title === "Normal"
+            ? "Best all-round TAC order. Mixes realistic offers with selective upside."
+            : "Prioritises safer TAC-specific options to maximise offer probability."}
       </div>
     </div>
   );
 }
 
-  function TabButton({
+function TabButton({
   active,
   onClick,
   label,
@@ -1224,7 +1358,7 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
 
   const [selectedTac, setSelectedTac] = useState<TacSystem>("QTAC");
   const [preferenceGoal, setPreferenceGoal] =
-    useState<PreferenceGoal>("balanced");
+    useState<PreferenceGoal>("normal");
   const [preferences, setPreferences] = useState<UniKey[]>([
     "uq",
     "jcu",
@@ -1280,41 +1414,41 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
     ]
   );
 
+  const tacScopedOptions = useMemo(() => {
+    return getTacScopedUniversities(evaluatedBase, selectedTac);
+  }, [evaluatedBase, selectedTac]);
+
   const preferenceScoped = useMemo(() => {
     return scorePreferences(
       evaluatedBase,
-      baseProfile,
       selectedTac,
       preferenceGoal,
       preferences
     );
-  }, [evaluatedBase, baseProfile, selectedTac, preferenceGoal, preferences]);
+  }, [evaluatedBase, selectedTac, preferenceGoal, preferences]);
 
   const preferenceStrategies = useMemo(() => {
     return {
       safe: scorePreferences(
         evaluatedBase,
-        { ...baseProfile, riskTolerance: 0 },
         selectedTac,
         "safe",
         preferences
       ),
-      balanced: scorePreferences(
+      normal: scorePreferences(
         evaluatedBase,
-        { ...baseProfile, riskTolerance: 2 },
         selectedTac,
-        "balanced",
+        "normal",
         preferences
       ),
       aggressive: scorePreferences(
         evaluatedBase,
-        { ...baseProfile, riskTolerance: 4 },
         selectedTac,
         "aggressive",
         preferences
       ),
     };
-  }, [evaluatedBase, baseProfile, selectedTac, preferences]);
+  }, [evaluatedBase, selectedTac, preferences]);
 
   const interviewSchools = useMemo(() => {
     return evaluatedBase
@@ -1425,7 +1559,7 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
             icon={LineChart}
             eyebrow="OPTIMISE"
             title="Turn your performance into strategic decisions"
-            description="This layer should feel like a decision engine, not a giant form. The profile stays compact, while each tab handles one real job: bonded choices, preference order, interview planning, competitiveness insights, and scenarios."
+            description="This layer should feel like a decision engine, not a giant form. The profile stays compact, while each tab handles one real job: bonded choices, preference ordering, interview planning, competitiveness insights, and scenarios."
           />
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -1641,12 +1775,12 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                     label="Filter by TAC system"
                     value={selectedTac}
                     onChange={(value) => {
-                      setSelectedTac(value as TacSystem);
+                      const nextTac = value as TacSystem;
+                      setSelectedTac(nextTac);
                       setPreferences((current) =>
                         current.filter(
                           (key) =>
-                            UNIVERSITY_RULES.find((u) => u.key === key)?.tac ===
-                            (value as TacSystem)
+                            UNIVERSITY_RULES.find((u) => u.key === key)?.tac === nextTac
                         )
                       );
                     }}
@@ -1667,6 +1801,9 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                       selectedTargets={preferences}
                       onToggle={togglePreference}
                     />
+                    <p className="mt-2 text-xs text-slate-500">
+                      These act as preference boosts only. The optimiser still ranks all universities inside the selected TAC so the strategy stays realistic.
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -1722,6 +1859,18 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                       <option value="prefer">Prefer bonded if helpful</option>
                     </FilterSelect>
                   </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Pill tone="slate">Current TAC</Pill>
+                      <Pill tone="violet">{selectedTac}</Pill>
+                      <Pill tone="blue">{tacScopedOptions.length} options analysed</Pill>
+                      <Pill tone="emerald">{preferences.filter((key) => UNIVERSITY_RULES.find((u) => u.key === key)?.tac === selectedTac).length} selected in this TAC</Pill>
+                    </div>
+                    <p className="mt-3 text-sm text-slate-600">
+                      The optimiser now builds Safe, Normal, and Aggressive lists strictly inside <span className="font-semibold text-slate-900">{selectedTac}</span>. No cross-TAC mixing.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -1729,22 +1878,88 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                 <PreferenceCard
                   tone="rose"
                   title="Aggressive"
-                  subtitle="Higher upside, higher risk of no offer."
+                  subtitle="Higher upside, higher risk, but only within this TAC."
                   items={preferenceStrategies.aggressive}
+                  selectedTargets={preferences}
                 />
                 <PreferenceCard
                   tone="blue"
-                  title="Balanced"
-                  subtitle="Mix of stretch and realistic targets."
-                  items={preferenceStrategies.balanced}
+                  title="Normal"
+                  subtitle="Best overall mix of realistic and selective options in this TAC."
+                  items={preferenceStrategies.normal}
+                  selectedTargets={preferences}
                 />
                 <PreferenceCard
                   tone="emerald"
                   title="Safe"
-                  subtitle="Maximises probability of receiving an offer."
+                  subtitle="Maximises probability of receiving an offer in this TAC."
                   items={preferenceStrategies.safe}
+                  selectedTargets={preferences}
                 />
               </div>
+
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-violet-600" />
+                  <h3 className="text-xl font-black tracking-tight text-slate-950">
+                    Live preview: {PREFERENCE_GOAL_LABEL[preferenceGoal]} order
+                  </h3>
+                </div>
+                <p className="mb-5 text-sm text-slate-600">
+                  {PREFERENCE_GOAL_COPY[preferenceGoal]}
+                </p>
+
+                <div className="mb-5 grid gap-2 sm:grid-cols-3">
+                  {(["aggressive", "normal", "safe"] as PreferenceGoal[]).map((goal) => (
+                    <button
+                      key={goal}
+                      onClick={() => setPreferenceGoal(goal)}
+                      className={cn(
+                        "rounded-2xl border px-4 py-3 text-sm font-semibold transition",
+                        preferenceGoal === goal
+                          ? "border-slate-950 bg-slate-950 text-white"
+                          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                      )}
+                    >
+                      {PREFERENCE_GOAL_LABEL[goal]}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid gap-3">
+                  {preferenceScoped.slice(0, 8).map((uni, index) => {
+                    const selected = preferences.includes(uni.key);
+
+                    return (
+                      <div
+                        key={uni.key}
+                        className={cn(
+                          "flex items-center justify-between rounded-2xl border px-4 py-3",
+                          selected ? "border-violet-200 bg-violet-50" : "border-slate-200 bg-slate-50"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-black text-slate-700">
+                            {index + 1}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <div className="font-semibold text-slate-950">{uni.name}</div>
+                              {selected ? <Pill tone="violet">Selected</Pill> : null}
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {uni.pathway} · {bandLabel(uni.band)}
+                            </div>
+                          </div>
+                        </div>
+                        <Pill tone={uni.band === "strong" ? "emerald" : uni.band === "competitive" ? "blue" : uni.band === "possible" ? "amber" : "rose"}>
+                          {bandLabel(uni.band)}
+                        </Pill>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
             </section>
           )}
 

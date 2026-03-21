@@ -13,15 +13,20 @@ export default async function OptimisePage() {
 
   const supabase = await createClient();
 
-  const { data: subscription } = await supabase
+  const { data: subscription, error } = await supabase
     .from("user_subscriptions")
     .select("plan, subscription_status")
     .eq("clerk_user_id", userId)
     .maybeSingle();
 
-  const isPremium =
-    subscription?.subscription_status === "active" &&
-    hasPremiumAccess(subscription?.plan);
+  if (error) {
+    console.error("[OptimisePage] subscription lookup failed:", error.message);
+  }
+
+  const isPremium = hasPremiumAccess(
+    subscription?.plan ?? null,
+    subscription?.subscription_status ?? null
+  );
 
   return <OptimiseClient isPremium={isPremium} />;
 }

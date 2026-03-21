@@ -13,15 +13,20 @@ export default async function BudgetPage() {
 
   const supabase = await createClient();
 
-  const { data: subscription } = await supabase
+  const { data: subscription, error } = await supabase
     .from("user_subscriptions")
     .select("plan, subscription_status")
     .eq("clerk_user_id", userId)
     .maybeSingle();
 
-  const isPremium =
-    subscription?.subscription_status === "active" &&
-    hasPremiumAccess(subscription?.plan);
+  if (error) {
+    console.error("Failed to fetch subscription for budget page:", error);
+  }
+
+  const isPremium = hasPremiumAccess(
+    subscription?.plan ?? null,
+    subscription?.subscription_status ?? null
+  );
 
   return <BudgetClient isPremium={isPremium} />;
 }

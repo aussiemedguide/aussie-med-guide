@@ -41,16 +41,31 @@ async function upsertSubscriptionRecord(params: {
     { onConflict: "clerk_user_id" }
   );
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 }
 
 function getPlanFromPriceId(priceId?: string | null) {
   if (!priceId) return "free";
   if (priceId === process.env.STRIPE_PRO_MONTHLY) return "monthly";
   if (priceId === process.env.STRIPE_PRO_ANNUAL) return "annual";
-  return "unknown";
+  return "free";
+}
+
+async function getClerkUserIdFromCustomer(customerId?: string | null) {
+  if (!customerId) return null;
+
+  const { data, error } = await supabase
+    .from("user_subscriptions")
+    .select("clerk_user_id")
+    .eq("stripe_customer_id", customerId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to find clerk user from stripe customer:", error);
+    return null;
+  }
+
+  return data?.clerk_user_id ?? null;
 }
 
 export async function POST(req: Request) {
@@ -97,16 +112,35 @@ export async function POST(req: Request) {
           typeof session.subscription === "string" ? session.subscription : null;
         const plan = session.metadata?.plan ?? "free";
 
-        if (clerkUserId) {
-          await upsertSubscriptionRecord({
-            clerkUserId,
-            stripeCustomerId,
-            stripeSubscriptionId,
-            subscriptionStatus: "active",
-            plan,
-            currentPeriodEnd: null,
-          });
+        if (!clerkUserId) {
+          console.warn("Missing clerk_user_id in checkout session metadata");
+          break;
         }
+
+        let currentPeriodEnd: string | null = null;
+
+        if (stripeSubscriptionId) {
+          const subscription = await stripe.subscriptions.retrieve(
+            stripeSubscriptionId
+          );
+
+          const periodEnd = (subscription as Stripe.Subscription & {
+            current_period_end?: number;
+          }).current_period_end;
+
+          if (periodEnd) {
+            currentPeriodEnd = new Date(periodEnd * 1000).toISOString();
+          }
+        }
+
+        await upsertSubscriptionRecord({
+          clerkUserId,
+          stripeCustomerId,
+          stripeSubscriptionId,
+          subscriptionStatus: "active",
+          plan,
+          currentPeriodEnd,
+        });
 
         break;
       }
@@ -115,35 +149,39 @@ export async function POST(req: Request) {
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
 
-        const clerkUserId = subscription.metadata?.clerk_user_id ?? null;
         const stripeCustomerId =
           typeof subscription.customer === "string" ? subscription.customer : null;
+
+        let clerkUserId = subscription.metadata?.clerk_user_id ?? null;
+
+        if (!clerkUserId) {
+          clerkUserId = await getClerkUserIdFromCustomer(stripeCustomerId);
+        }
 
         const priceId = subscription.items.data[0]?.price?.id ?? null;
         const plan = subscription.metadata?.plan || getPlanFromPriceId(priceId);
 
-        let currentPeriodEnd: string | null = null;
-
-        const subWithPeriod = subscription as Stripe.Subscription & {
+        const periodEnd = (subscription as Stripe.Subscription & {
           current_period_end?: number;
-        };
+        }).current_period_end;
 
-        if (subWithPeriod.current_period_end) {
-          currentPeriodEnd = new Date(
-            subWithPeriod.current_period_end * 1000
-          ).toISOString();
+        const currentPeriodEnd = periodEnd
+          ? new Date(periodEnd * 1000).toISOString()
+          : null;
+
+        if (!clerkUserId) {
+          console.warn("Could not resolve clerk_user_id for subscription event");
+          break;
         }
 
-        if (clerkUserId) {
-          await upsertSubscriptionRecord({
-            clerkUserId,
-            stripeCustomerId,
-            stripeSubscriptionId: subscription.id,
-            subscriptionStatus: subscription.status,
-            plan,
-            currentPeriodEnd,
-          });
-        }
+        await upsertSubscriptionRecord({
+          clerkUserId,
+          stripeCustomerId,
+          stripeSubscriptionId: subscription.id,
+          subscriptionStatus: subscription.status,
+          plan,
+          currentPeriodEnd,
+        });
 
         break;
       }
@@ -151,20 +189,28 @@ export async function POST(req: Request) {
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
 
-        const clerkUserId = subscription.metadata?.clerk_user_id ?? null;
         const stripeCustomerId =
           typeof subscription.customer === "string" ? subscription.customer : null;
 
-        if (clerkUserId) {
-          await upsertSubscriptionRecord({
-            clerkUserId,
-            stripeCustomerId,
-            stripeSubscriptionId: subscription.id,
-            subscriptionStatus: "canceled",
-            plan: "free",
-            currentPeriodEnd: null,
-          });
+        let clerkUserId = subscription.metadata?.clerk_user_id ?? null;
+
+        if (!clerkUserId) {
+          clerkUserId = await getClerkUserIdFromCustomer(stripeCustomerId);
         }
+
+        if (!clerkUserId) {
+          console.warn("Could not resolve clerk_user_id for deleted subscription");
+          break;
+        }
+
+        await upsertSubscriptionRecord({
+          clerkUserId,
+          stripeCustomerId,
+          stripeSubscriptionId: subscription.id,
+          subscriptionStatus: "canceled",
+          plan: "free",
+          currentPeriodEnd: null,
+        });
 
         break;
       }

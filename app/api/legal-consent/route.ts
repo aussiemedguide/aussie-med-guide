@@ -1,70 +1,54 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
+import { auth } from "@clerk/nextjs/server";
+import { createClient } from "@supabase/supabase-js";
 
-export async function POST(request: Request) {
+export const runtime = "nodejs";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function POST(req: Request) {
   try {
-    const body = await request.json();
-    const cookieStore = await cookies();
+    const { userId } = await auth();
 
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) => {
-                cookieStore.set(name, value, options);
-              });
-            } catch {
-              // ignore
-            }
-          },
-        },
-      }
-    );
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const body = await req.json();
 
-    if (authError || !user) {
+    const version = String(body?.version ?? "");
+    const source = String(body?.source ?? "unknown");
+    const plan = String(body?.plan ?? "free");
+
+    if (!version) {
       return NextResponse.json(
-        { error: "You must be signed in first." },
-        { status: 401 }
+        { error: "Missing consent version." },
+        { status: 400 }
       );
     }
 
-    const now = new Date().toISOString();
-
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        accepted_terms: true,
-        accepted_terms_at: body.acceptedTerms ? now : null,
-        accepted_privacy_at: body.acceptedPrivacy ? now : null,
-        accepted_disclaimer_at: body.acceptedDisclaimer ? now : null,
-        accepted_payments_terms_at: body.acceptedPayments ? now : null,
-        consent_version: body.version ?? null,
-        consent_source: body.source ?? "pricing_checkout",
-        updated_at: now,
-      })
-      .eq("id", user.id);
+    const { error } = await supabase.from("legal_consents").insert({
+      clerk_user_id: userId,
+      version,
+      accepted_terms: Boolean(body?.acceptedTerms),
+      accepted_privacy: Boolean(body?.acceptedPrivacy),
+      accepted_disclaimer: Boolean(body?.acceptedDisclaimer),
+      accepted_payments: Boolean(body?.acceptedPayments),
+      source,
+      plan,
+    });
 
     if (error) {
-      return NextResponse.json(
-        { error: error.message || "Failed to save consent." },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unexpected server error.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

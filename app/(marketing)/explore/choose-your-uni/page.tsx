@@ -821,19 +821,43 @@ function scoreUniversities(pathway: PathwayKey, answers: Record<string, number>)
 function QuizCard({ pathway }: { pathway: PathwayKey }) {
   const questions = getQuestions(pathway);
   const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
   const [finished, setFinished] = useState(false);
 
   const current = questions[index];
-  const progress = Math.round((index / questions.length) * 100);
-  const results = useMemo(() => scoreUniversities(pathway, answers), [pathway, answers]);
 
-  function chooseAnswer(delta: Record<string, number>) {
-    const merged = { ...answers };
-    Object.entries(delta).forEach(([key, value]) => {
-      merged[key] = (merged[key] ?? 0) + value;
+  const computedScores = useMemo(() => {
+    const totals: Record<string, number> = {};
+
+    questions.forEach((question) => {
+      const selectedIndex = selectedAnswers[question.id];
+      if (selectedIndex === undefined) return;
+
+      const selected = question.answers[selectedIndex];
+      if (!selected) return;
+
+      Object.entries(selected.delta).forEach(([key, value]) => {
+        totals[key] = (totals[key] ?? 0) + value;
+      });
     });
-    setAnswers(merged);
+
+    return totals;
+  }, [questions, selectedAnswers]);
+
+  const answeredCount = Object.keys(selectedAnswers).length;
+  const progress = Math.round((answeredCount / questions.length) * 100);
+  const results = useMemo(
+    () => scoreUniversities(pathway, computedScores),
+    [pathway, computedScores]
+  );
+
+  function chooseAnswer(answerIndex: number) {
+    const questionId = current.id;
+
+    setSelectedAnswers((prev) => ({
+      ...prev,
+      [questionId]: answerIndex,
+    }));
 
     if (index === questions.length - 1) {
       setFinished(true);
@@ -842,16 +866,30 @@ function QuizCard({ pathway }: { pathway: PathwayKey }) {
     }
   }
 
+  function goBack() {
+    if (finished) {
+      setFinished(false);
+      setIndex(questions.length - 1);
+      return;
+    }
+
+    if (index > 0) {
+      setIndex((i) => i - 1);
+    }
+  }
+
   function restart() {
     setIndex(0);
-    setAnswers({});
+    setSelectedAnswers({});
     setFinished(false);
   }
 
   return (
     <SoftCard className="p-6">
       <div className="mb-4">
-        <h2 className="text-3xl font-black tracking-tight text-slate-950">What Med School is Best Suited to You?</h2>
+        <h2 className="text-3xl font-black tracking-tight text-slate-950">
+          What Med School is Best Suited to You?
+        </h2>
         <p className="mt-1 text-sm text-slate-500">
           This is the med-school version of a “what kind of Disney princess are you?” quiz, except it matches study style, lifestyle, resources, and pathway fit.
         </p>
@@ -863,7 +901,9 @@ function QuizCard({ pathway }: { pathway: PathwayKey }) {
             key={key}
             className={cx(
               "rounded-xl border px-4 py-2 text-sm font-semibold",
-              key === pathway ? "bg-slate-950 text-white border-slate-950" : "bg-white text-slate-700 border-slate-200"
+              key === pathway
+                ? "border-slate-950 bg-slate-950 text-white"
+                : "border-slate-200 bg-white text-slate-700"
             )}
           >
             {pathwayLabel(key)}
@@ -874,33 +914,61 @@ function QuizCard({ pathway }: { pathway: PathwayKey }) {
       {!finished ? (
         <div className="space-y-5">
           <div className="flex items-center justify-between text-sm text-slate-500">
-            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-medium">Question {index + 1} of {questions.length}</span>
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-medium">
+              Question {index + 1} of {questions.length}
+            </span>
             <span>{progress}% complete</span>
           </div>
 
           <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-            <motion.div className="h-full rounded-full bg-slate-900" initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 0.25 }} />
+            <motion.div
+              className="h-full rounded-full bg-slate-900"
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.25 }}
+            />
           </div>
 
           <div>
-            <h3 className="text-3xl font-black tracking-tight text-slate-950">{current.text}</h3>
+            <h3 className="text-3xl font-black tracking-tight text-slate-950">
+              {current.text}
+            </h3>
           </div>
 
           <div className="space-y-3">
-            {current.answers.map((answer) => (
-              <button
-                key={answer.text}
-                onClick={() => chooseAnswer(answer.delta)}
-                className="w-full rounded-[18px] border border-slate-200 bg-white px-5 py-5 text-left text-base font-medium text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50"
-              >
-                {answer.text}
-              </button>
-            ))}
+            {current.answers.map((answer, answerIndex) => {
+              const isSelected = selectedAnswers[current.id] === answerIndex;
+
+              return (
+                <button
+                  key={answer.text}
+                  onClick={() => chooseAnswer(answerIndex)}
+                  className={cx(
+                    "w-full rounded-[18px] border px-5 py-5 text-left text-base font-medium shadow-sm transition",
+                    isSelected
+                      ? "border-emerald-400 bg-emerald-50 text-emerald-900"
+                      : "border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50"
+                  )}
+                >
+                  {answer.text}
+                </button>
+              );
+            })}
           </div>
 
-          <div className="flex items-center justify-between pt-2 text-sm text-slate-400">
-            <span>Back</span>
-            <button onClick={restart} className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-800">
+          <div className="flex items-center justify-between pt-2 text-sm">
+            <button
+              onClick={goBack}
+              disabled={index === 0}
+              className="text-slate-500 transition hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Back
+            </button>
+
+            <button
+              onClick={restart}
+              className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-800"
+            >
               <RotateCcw className="h-4 w-4" />
               Restart
             </button>
@@ -912,24 +980,56 @@ function QuizCard({ pathway }: { pathway: PathwayKey }) {
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-200">
               <Sparkles className="h-7 w-7" />
             </div>
-            <h3 className="text-4xl font-black tracking-tight text-slate-950">Your University Matches</h3>
-            <p className="mt-2 text-sm text-slate-500">Based on your preferences and study style ({pathwayLabel(pathway)})</p>
+            <h3 className="text-4xl font-black tracking-tight text-slate-950">
+              Your University Matches
+            </h3>
+            <p className="mt-2 text-sm text-slate-500">
+              Based on your preferences and study style ({pathwayLabel(pathway)})
+            </p>
           </div>
 
           <div className="space-y-4">
             {results.map((result, i) => (
-              <div key={result.uni.id} className={cx("rounded-[20px] border p-5", i === 0 ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white") }>
+              <div
+                key={result.uni.id}
+                className={cx(
+                  "rounded-[20px] border p-5",
+                  i === 0
+                    ? "border-emerald-300 bg-emerald-50"
+                    : "border-slate-200 bg-white"
+                )}
+              >
                 <div className="mb-3 flex items-center justify-between gap-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    {i === 0 ? <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white">Best Match</span> : null}
-                    <h4 className="text-2xl font-black tracking-tight text-slate-950">{result.uni.shortName}</h4>
-                    <span className={cx("rounded-full px-3 py-1 text-xs font-bold shadow-sm", tacMeta[result.uni.tac].pill)}>{tacMeta[result.uni.tac].label}</span>
+                    {i === 0 ? (
+                      <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white">
+                        Best Match
+                      </span>
+                    ) : null}
+                    <h4 className="text-2xl font-black tracking-tight text-slate-950">
+                      {result.uni.shortName}
+                    </h4>
+                    <span
+                      className={cx(
+                        "rounded-full px-3 py-1 text-xs font-bold shadow-sm",
+                        tacMeta[result.uni.tac].pill
+                      )}
+                    >
+                      {tacMeta[result.uni.tac].label}
+                    </span>
                   </div>
-                  <span className="text-xl font-black text-emerald-700">{result.probability}%</span>
+                  <span className="text-xl font-black text-emerald-700">
+                    {result.probability}%
+                  </span>
                 </div>
 
                 <div className="mb-3 h-2 overflow-hidden rounded-full bg-slate-200">
-                  <motion.div className="h-full rounded-full bg-slate-950" initial={{ width: 0 }} animate={{ width: `${result.probability}%` }} transition={{ duration: 0.5 }} />
+                  <motion.div
+                    className="h-full rounded-full bg-slate-950"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${result.probability}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
                 </div>
 
                 <p className="text-sm text-slate-500">{result.uni.name}</p>
@@ -937,8 +1037,18 @@ function QuizCard({ pathway }: { pathway: PathwayKey }) {
             ))}
           </div>
 
-          <div className="flex justify-center">
-            <button onClick={restart} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+          <div className="flex justify-center gap-3">
+            <button
+              onClick={goBack}
+              className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              Back
+            </button>
+
+            <button
+              onClick={restart}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
               <RotateCcw className="h-4 w-4" />
               Take Quiz Again
             </button>
@@ -969,24 +1079,43 @@ function JourneyAccordion() {
 
   return (
     <SoftCard className="p-5">
-      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between gap-4 text-left">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-4 text-left"
+      >
         <div>
-          <h3 className="text-2xl font-black tracking-tight text-slate-950">The Medical Journey</h3>
-          <p className="mt-1 text-sm text-slate-500">What the path to becoming a doctor really looks like</p>
+          <h3 className="text-2xl font-black tracking-tight text-slate-950">
+            The Medical Journey
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">
+            What the path to becoming a doctor really looks like
+          </p>
         </div>
-        <ChevronDown className={cx("h-5 w-5 text-slate-500 transition", open ? "rotate-180" : "rotate-0")} />
+        <ChevronDown
+          className={cx(
+            "h-5 w-5 text-slate-500 transition",
+            open ? "rotate-180" : "rotate-0"
+          )}
+        />
       </button>
 
       <AnimatePresence initial={false}>
         {open && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
             <div className="mt-5 space-y-3">
               {items.map(([title, age, desc, tone]) => (
                 <div key={title} className={cx("rounded-[20px] border p-4", tone)}>
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-lg font-black tracking-tight">{title}</p>
-                      <span className="mt-2 inline-block rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">{age}</span>
+                      <span className="mt-2 inline-block rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        {age}
+                      </span>
                       <p className="mt-3 text-sm">{desc}</p>
                     </div>
                     <ChevronDown className="h-4 w-4 opacity-70" />
@@ -1013,7 +1142,6 @@ function JourneyAccordion() {
 
 export default function ChooseYourUniPage() {
   const [pathway, setPathway] = useState<PathwayKey>("undergrad");
-  const [showJourney, setShowJourney] = useState(true);
 
   const filteredUniversities = useMemo(() => {
     return universities.filter((u) => u.pathway.includes(pathway));
@@ -1041,7 +1169,9 @@ export default function ChooseYourUniPage() {
 
           <div className="relative z-10 space-y-6">
             <div>
-              <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-5xl">Choose Your Uni</h1>
+              <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-5xl">
+                Choose Your Uni
+              </h1>
               <p className="mt-2 text-sm leading-7 text-slate-600 sm:text-base">
                 Find your best-fit university, match to your study style, and view all the core details for each med pathway in one spot.
               </p>
@@ -1050,21 +1180,28 @@ export default function ChooseYourUniPage() {
             <SoftCard className="p-5">
               <div className="mb-4 flex items-center gap-2 text-slate-950">
                 <School className="h-5 w-5 text-emerald-600" />
-                <h2 className="text-2xl font-black tracking-tight">Entry Pathways into Medicine</h2>
+                <h2 className="text-2xl font-black tracking-tight">
+                  Entry Pathways into Medicine
+                </h2>
               </div>
-              <p className="mb-4 text-sm text-slate-500">Understanding the different routes to medical school</p>
+              <p className="mb-4 text-sm text-slate-500">
+                Understanding the different routes to medical school
+              </p>
 
               <div className="mb-4 rounded-[18px] border border-slate-200 bg-slate-50 p-1">
                 <div className="grid grid-cols-3 gap-1">
                   {(["undergrad", "postgrad", "biomed"] as PathwayKey[]).map((key) => {
                     const Icon = pathwayIcon(key);
+
                     return (
                       <button
                         key={key}
                         onClick={() => setPathway(key)}
                         className={cx(
                           "rounded-xl px-4 py-3 text-sm font-semibold transition",
-                          pathway === key ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:bg-white/70 hover:text-slate-900"
+                          pathway === key
+                            ? "bg-white text-slate-950 shadow-sm"
+                            : "text-slate-500 hover:bg-white/70 hover:text-slate-900"
                         )}
                       >
                         <span className="inline-flex items-center gap-2">
@@ -1089,14 +1226,35 @@ export default function ChooseYourUniPage() {
 
               <div className="mt-5 space-y-3">
                 {filteredUniversities.map((uni) => (
-                  <div key={uni.id} className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
+                  <div
+                    key={uni.id}
+                    className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3"
+                  >
                     <div className="flex flex-wrap items-center gap-3">
-                      <span className={cx("rounded-full px-3 py-1 text-xs font-bold shadow-sm", tacMeta[uni.tac].pill)}>{tacMeta[uni.tac].label}</span>
-                      <span className="text-base font-semibold text-slate-900">{uni.shortName}</span>
+                      <span
+                        className={cx(
+                          "rounded-full px-3 py-1 text-xs font-bold shadow-sm",
+                          tacMeta[uni.tac].pill
+                        )}
+                      >
+                        {tacMeta[uni.tac].label}
+                      </span>
+                      <span className="text-base font-semibold text-slate-900">
+                        {uni.shortName}
+                      </span>
                     </div>
+
                     <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
-                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold">{uni.duration}</span>
-                      <span>{pathway === "biomed" ? "Biomed pathway" : pathway === "postgrad" ? "Postgrad" : "Direct entry"}</span>
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold">
+                        {uni.duration}
+                      </span>
+                      <span>
+                        {pathway === "biomed"
+                          ? "Biomed pathway"
+                          : pathway === "postgrad"
+                            ? "Postgrad"
+                            : "Direct entry"}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -1118,11 +1276,6 @@ export default function ChooseYourUniPage() {
             <QuizCard pathway={pathway} />
 
             <JourneyAccordion />
-
-            <div className="space-y-4">
-               <div className="space-y-4">
-            </div>
-            </div>
           </div>
         </div>
       </div>

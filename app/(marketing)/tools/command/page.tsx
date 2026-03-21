@@ -1,19 +1,98 @@
 import { redirect } from "next/navigation";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { createClient } from "@/lib/supabase/server";
-import { hasPremiumAccess } from "@/lib/access";
 import CommandClient from "./command-client";
+import { createClient } from "@/lib/supabase/server";
 
-const DEFAULT_PROFILE = {
+type EventType =
+  | "ucat"
+  | "applications"
+  | "rural"
+  | "interviews"
+  | "offers"
+  | "personal";
+
+type Profile = {
+  name: string;
+  email: string;
+  yearLevel: string;
+  state: string;
+  category: string;
+  pathway: string;
+  atar: number;
+  ucat: number;
+  interviewScore: number;
+  targetUnis: string[];
+  avatar: string;
+};
+
+type DashboardEvent = {
+  id: string;
+  title: string;
+  date: string;
+  type: EventType;
+  notes?: string;
+  source: "system" | "custom";
+};
+
+type SiteSettings = {
+  commandLastUpdatedAt: string | null;
+  scheduledDowntimeStartAt: string | null;
+  scheduledDowntimeEndAt: string | null;
+  maintenanceMode: boolean;
+  maintenanceMessage: string;
+};
+
+type SubscriptionInfo = {
+  planKey: "free" | "pro_monthly" | "pro_annual";
+  status:
+    | "free"
+    | "trialing"
+    | "active"
+    | "past_due"
+    | "canceled"
+    | "unpaid"
+    | "incomplete"
+    | "incomplete_expired";
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+};
+
+type CommandStatusValue = {
+  command_last_updated_at: string | null;
+  scheduled_downtime_start_at: string | null;
+  scheduled_downtime_end_at: string | null;
+  maintenance_mode: boolean;
+  maintenance_message: string;
+};
+
+const DEFAULT_PROFILE: Profile = {
   name: "",
+  email: "",
   yearLevel: "Year 11",
   state: "QLD",
   category: "Metropolitan",
   pathway: "Undergraduate",
   atar: 99,
-  ucat: 2000,
-  interviewScore: 1,
-  targetUnis: [] as string[],
+  ucat: 2500,
+  interviewScore: 3,
+  targetUnis: [],
+  avatar: "stethoscope",
+};
+
+const DEFAULT_SITE_SETTINGS: SiteSettings = {
+  commandLastUpdatedAt: null,
+  scheduledDowntimeStartAt: null,
+  scheduledDowntimeEndAt: null,
+  maintenanceMode: false,
+  maintenanceMessage:
+    "Aussie Med Guide is currently undergoing scheduled improvements. You can still sign in and access your account.",
+};
+
+const DEFAULT_SUBSCRIPTION: SubscriptionInfo = {
+  planKey: "free",
+  status: "free",
+  currentPeriodEnd: null,
+  cancelAtPeriodEnd: false,
 };
 
 export default async function CommandPage() {
@@ -26,91 +105,108 @@ export default async function CommandPage() {
   const clerkUser = await currentUser();
   const supabase = await createClient();
 
-  const { data: subscription } = await supabase
-    .from("user_subscriptions")
-    .select("plan, subscription_status")
-    .eq("clerk_user_id", userId)
-    .maybeSingle();
+  const [profileRes, eventsRes, subscriptionRes, settingsRes] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select(
+          "display_name, full_name, email, year_level, state, category, pathway, atar, ucat, interview_score, target_unis, avatar_url"
+        )
+        .eq("clerk_user_id", userId)
+        .maybeSingle(),
+      supabase
+        .from("command_events")
+        .select("id, title, date, type, notes, source")
+        .eq("user_id", userId)
+        .order("date", { ascending: true }),
+      supabase
+        .from("subscriptions")
+        .select("plan, status, current_period_end, cancel_at_period_end")
+        .eq("clerk_user_id", userId)
+        .maybeSingle(),
+      supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "command_status")
+        .maybeSingle(),
+    ]);
 
-  const planValue = String(subscription?.plan ?? "free").toLowerCase();
-  const isPremium =
-    subscription?.subscription_status === "active" &&
-    (hasPremiumAccess(subscription?.plan) ||
-      planValue === "pro" ||
-      planValue === "monthly" ||
-      planValue === "annual" ||
-      planValue === "premium");
+  const profile = profileRes.data;
+  const events = eventsRes.data ?? [];
+  const subscription = subscriptionRes.data;
+  const commandStatus = (settingsRes.data?.value ?? {}) as Partial<CommandStatusValue>;
 
-  const { data: commandProfile } = await supabase
-    .from("command_profiles")
-    .select(
-      "display_name, year_level, state, category, pathway, atar, ucat, interview_score, target_unis"
-    )
-    .eq("clerk_user_id", userId)
-    .maybeSingle();
-
-  const { data: customEvents } = await supabase
-    .from("command_events")
-    .select("id, title, date, type, notes, source")
-    .eq("clerk_user_id", userId)
-    .order("date", { ascending: true });
-
-  const email =
-    clerkUser?.primaryEmailAddress?.emailAddress ??
-    clerkUser?.emailAddresses?.[0]?.emailAddress ??
-    "";
-
-  const fullName =
-    [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(" ") || "";
-
-  const initialProfile = {
+  const initialProfile: Profile = {
+    ...DEFAULT_PROFILE,
     name:
-      commandProfile?.display_name ||
-      fullName ||
-      email.split("@")[0] ||
-      DEFAULT_PROFILE.name,
-    yearLevel: commandProfile?.year_level || DEFAULT_PROFILE.yearLevel,
-    state: commandProfile?.state || DEFAULT_PROFILE.state,
-    category: commandProfile?.category || DEFAULT_PROFILE.category,
-    pathway: commandProfile?.pathway || DEFAULT_PROFILE.pathway,
-    atar: Number(commandProfile?.atar ?? DEFAULT_PROFILE.atar),
-    ucat: Number(commandProfile?.ucat ?? DEFAULT_PROFILE.ucat),
+      profile?.display_name ||
+      profile?.full_name ||
+      clerkUser?.firstName ||
+      clerkUser?.fullName ||
+      "",
+    email:
+      profile?.email ||
+      clerkUser?.primaryEmailAddress?.emailAddress ||
+      clerkUser?.emailAddresses?.[0]?.emailAddress ||
+      "",
+    yearLevel: profile?.year_level || DEFAULT_PROFILE.yearLevel,
+    state: profile?.state || DEFAULT_PROFILE.state,
+    category: profile?.category || DEFAULT_PROFILE.category,
+    pathway: profile?.pathway || DEFAULT_PROFILE.pathway,
+    atar: Number(profile?.atar ?? DEFAULT_PROFILE.atar),
+    ucat: Number(profile?.ucat ?? DEFAULT_PROFILE.ucat),
     interviewScore: Number(
-      commandProfile?.interview_score ?? DEFAULT_PROFILE.interviewScore
+      profile?.interview_score ?? DEFAULT_PROFILE.interviewScore
     ),
-    targetUnis: Array.isArray(commandProfile?.target_unis)
-      ? (commandProfile.target_unis as string[])
-      : DEFAULT_PROFILE.targetUnis,
+    targetUnis: profile?.target_unis ?? DEFAULT_PROFILE.targetUnis,
+    avatar: profile?.avatar_url || DEFAULT_PROFILE.avatar,
   };
 
-  const initialCustomDates: {
-    id: string;
-    title: string;
-    date: string;
-    type: "ucat" | "applications" | "rural" | "interviews" | "offers" | "personal";
-    notes?: string;
-    source: "system" | "custom";
-  }[] = (customEvents ?? []).map((event) => ({
+  const initialCustomDates: DashboardEvent[] = events.map((event) => ({
     id: String(event.id),
     title: event.title,
-    date: String(event.date),
-    type: event.type as
-      | "ucat"
-      | "applications"
-      | "rural"
-      | "interviews"
-      | "offers"
-      | "personal",
+    date: event.date,
+    type: event.type as EventType,
     notes: event.notes ?? "",
-    source: "custom",
+    source: (event.source as "system" | "custom") ?? "custom",
   }));
+
+  const subscriptionInfo: SubscriptionInfo = {
+    planKey:
+      subscription?.plan === "pro_monthly" ||
+      subscription?.plan === "pro_annual"
+        ? subscription.plan
+        : "free",
+    status: (subscription?.status as SubscriptionInfo["status"]) ?? "free",
+    currentPeriodEnd: subscription?.current_period_end ?? null,
+    cancelAtPeriodEnd: subscription?.cancel_at_period_end ?? false,
+  };
+
+  const siteSettings: SiteSettings = {
+    commandLastUpdatedAt:
+      commandStatus.command_last_updated_at ??
+      DEFAULT_SITE_SETTINGS.commandLastUpdatedAt,
+    scheduledDowntimeStartAt:
+      commandStatus.scheduled_downtime_start_at ??
+      DEFAULT_SITE_SETTINGS.scheduledDowntimeStartAt,
+    scheduledDowntimeEndAt:
+      commandStatus.scheduled_downtime_end_at ??
+      DEFAULT_SITE_SETTINGS.scheduledDowntimeEndAt,
+    maintenanceMode:
+      commandStatus.maintenance_mode ?? DEFAULT_SITE_SETTINGS.maintenanceMode,
+    maintenanceMessage:
+      commandStatus.maintenance_message ??
+      DEFAULT_SITE_SETTINGS.maintenanceMessage,
+  };
 
   return (
     <CommandClient
       userId={userId}
-      isPremium={isPremium}
+      userEmail={initialProfile.email}
+      subscription={subscriptionInfo}
       initialProfile={initialProfile}
       initialCustomDates={initialCustomDates}
+      siteSettings={siteSettings}
     />
   );
 }

@@ -2,27 +2,33 @@
 
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { createClient } from "@/lib/supabase/client";''
+import Link from "next/link";
+import { useSession } from "@clerk/nextjs";
+import { createClient } from "@/lib/supabase/client";
 import {
   ArrowUpRight,
   Award,
   CalendarDays,
   Check,
-  CheckCircle2,
   ChevronRight,
+  Clock3,
   Crown,
   Edit3,
   Flame,
   Gift,
   GraduationCap,
+  HeartPulse,
   House,
   MapPinned,
   Plus,
   Save,
+  ShieldAlert,
   Sparkles,
+  Stethoscope,
   Target,
   TrendingUp,
   UserRound,
+  Wrench,
   X,
 } from "lucide-react";
 
@@ -45,6 +51,7 @@ type DashboardEvent = {
 
 type Profile = {
   name: string;
+  email: string;
   yearLevel: string;
   state: string;
   category: string;
@@ -53,13 +60,39 @@ type Profile = {
   ucat: number;
   interviewScore: number;
   targetUnis: string[];
+  avatar: string;
+};
+
+type SiteSettings = {
+  commandLastUpdatedAt: string | null;
+  scheduledDowntimeStartAt: string | null;
+  scheduledDowntimeEndAt: string | null;
+  maintenanceMode: boolean;
+  maintenanceMessage: string;
+};
+
+type SubscriptionInfo = {
+  planKey: "free" | "pro_monthly" | "pro_annual";
+  status:
+    | "free"
+    | "trialing"
+    | "active"
+    | "past_due"
+    | "canceled"
+    | "unpaid"
+    | "incomplete"
+    | "incomplete_expired";
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
 };
 
 type CommandClientProps = {
   userId: string;
-  isPremium: boolean;
+  userEmail: string;
+  subscription: SubscriptionInfo;
   initialProfile: Profile;
   initialCustomDates: DashboardEvent[];
+  siteSettings: SiteSettings;
 };
 
 const ALL_UNIS = [
@@ -198,6 +231,28 @@ const EVENT_STYLES: Record<EventType, string> = {
   personal: "border-slate-300 bg-slate-50 text-slate-900",
 };
 
+const AVATARS = [
+  { id: "stethoscope", label: "Stethoscope", icon: Stethoscope },
+  { id: "spark", label: "Spark", icon: Sparkles },
+  { id: "target", label: "Target", icon: Target },
+  { id: "heart", label: "Heart", icon: HeartPulse },
+  { id: "grad", label: "Graduate", icon: GraduationCap },
+  { id: "user", label: "Classic", icon: UserRound },
+];
+
+const MOTTOS = [
+  "Consistency beats intensity when the goal is medicine.",
+  "You do not need a perfect week. You need another solid day.",
+  "Pressure feels smaller when your process is stronger.",
+  "Confidence is usually built after the work, not before it.",
+  "The students who stay calm usually stay in control.",
+  "A good system will carry you when motivation disappears.",
+  "Medicine is not won in one day. It is built in hundreds of them.",
+  "Clarity first. Then effort. Then repetition.",
+  "Momentum grows when your habits stop depending on mood.",
+  "A strong applicant is usually just a consistent one.",
+];
+
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
@@ -210,11 +265,46 @@ function formatDate(date: string) {
   });
 }
 
+function formatShortDate(date: string) {
+  return new Date(date).toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatDateTime(date: string) {
+  return new Date(date).toLocaleString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function daysUntil(date: string) {
   const now = new Date();
   const target = new Date(date);
   const diff = target.getTime() - now.getTime();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+function getMottoDayNumber() {
+  const start = new Date("2026-01-01");
+  const now = new Date();
+  const diff = now.getTime() - start.getTime();
+  return Math.max(1, Math.floor(diff / (1000 * 60 * 60 * 24)) + 1);
+}
+
+function getDailyMotto(name?: string) {
+  const dayNumber = getMottoDayNumber();
+  const motto = MOTTOS[(dayNumber - 1) % MOTTOS.length];
+
+  return {
+    dayNumber,
+    text: name ? `${motto} ${name}, keep going.` : motto,
+  };
 }
 
 function buildICS(events: DashboardEvent[]) {
@@ -262,21 +352,103 @@ function buildGoogleCalendarLink(events: DashboardEvent[]) {
   )}`;
 }
 
+function formatRelativeUpdate(date: string | null) {
+  if (!date) return "Not set";
+
+  const now = new Date();
+  const target = new Date(date);
+  const diffMs = now.getTime() - target.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 0) return "Updated today";
+  if (diffDays === 1) return "Updated yesterday";
+  if (diffDays < 7) return `Updated ${diffDays} days ago`;
+
+  return `Updated ${formatShortDate(date)}`;
+}
+
+function formatDowntimeLabel(start: string | null, end: string | null) {
+  if (!start || !end) return "No scheduled downtime";
+
+  const now = new Date();
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+
+  if (now >= startDate && now <= endDate) return "Maintenance in progress";
+
+  return `Downtime ${formatShortDate(start)}`;
+}
+
+function formatDowntimeDetail(start: string | null, end: string | null) {
+  if (!start || !end) return "No scheduled downtime";
+
+  const now = new Date();
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+
+  if (now >= startDate && now <= endDate) {
+    return `In progress until ${formatDateTime(end)}`;
+  }
+
+  return `${formatDateTime(start)} to ${formatDateTime(end)}`;
+}
+
+function getPlanLabel(planKey: SubscriptionInfo["planKey"]) {
+  switch (planKey) {
+    case "pro_monthly":
+      return "Pro Monthly";
+    case "pro_annual":
+      return "Pro Annual";
+    default:
+      return "Free";
+  }
+}
+
+function getPlanAccent(planKey: SubscriptionInfo["planKey"]) {
+  switch (planKey) {
+    case "pro_monthly":
+    case "pro_annual":
+      return "border-amber-200 bg-amber-50 text-amber-950";
+    default:
+      return "border-white/20 bg-white/12 text-white";
+  }
+}
+
+function getBillingLabel(subscription: SubscriptionInfo) {
+  if (subscription.planKey === "free") {
+    return "Essential planning tools active";
+  }
+
+  if (subscription.status !== "active" && subscription.status !== "trialing") {
+    return `Status: ${subscription.status.replace(/_/g, " ")}`;
+  }
+
+  if (subscription.currentPeriodEnd) {
+    return subscription.cancelAtPeriodEnd
+      ? `Ends on ${formatShortDate(subscription.currentPeriodEnd)}`
+      : `Renews on ${formatShortDate(subscription.currentPeriodEnd)}`;
+  }
+
+  return "Billing active";
+}
+
 function SectionCard({
   title,
   description,
   icon,
   action,
   children,
+  className = "",
 }: {
   title: string;
   description?: string;
   icon?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
+    <section className={cn("rounded-3xl border border-slate-200 bg-white p-6 shadow-sm", className)}>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           {icon ? (
@@ -335,7 +507,7 @@ function ProCard({
 }) {
   if (unlocked) {
     return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60">
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-start gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
             {icon}
@@ -356,7 +528,7 @@ function ProCard({
   }
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60">
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-start gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
           {icon}
@@ -374,28 +546,51 @@ function ProCard({
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <p className="text-sm leading-6 text-slate-600">
-          Upgrade to unlock this part of Command. Your core profile and dashboard
-          stay usable on the free plan.
+          Upgrade to unlock this part of Command. Your core profile and account
+          stay available on the free plan.
         </p>
-        <a
+        <Link
           href="/pricing"
           className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
         >
           Upgrade to Pro
           <ChevronRight className="h-4 w-4" />
-        </a>
+        </Link>
       </div>
+    </div>
+  );
+}
+
+function AvatarPreview({ avatar }: { avatar: string }) {
+  const found = AVATARS.find((item) => item.id === avatar) ?? AVATARS[0];
+  const Icon = found.icon;
+
+  return (
+    <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-linear-to-br from-emerald-500 to-teal-500 text-white shadow-sm">
+      <Icon className="h-8 w-8" />
     </div>
   );
 }
 
 export default function CommandClient({
   userId,
-  isPremium,
+  userEmail,
+  subscription,
   initialProfile,
   initialCustomDates,
+  siteSettings,
 }: CommandClientProps) {
-  const supabase = createClient();
+  const { session } = useSession();
+
+  const supabase = useMemo(() => {
+    return createClient(async () => {
+      return await session?.getToken() ?? null;
+    });
+  }, [session]);
+
+  const isPremium =
+    subscription.planKey === "pro_monthly" ||
+    subscription.planKey === "pro_annual";
 
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const [customDates, setCustomDates] =
@@ -421,28 +616,36 @@ export default function CommandClient({
     return allEvents.filter((event) => daysUntil(event.date) >= 0).slice(0, 6);
   }, [allEvents]);
 
+  const nextEvent = upcoming[0] ?? null;
+
   const readinessBand = useMemo(() => {
     const atarScore = Math.min(100, profile.atar);
     const ucatScore = Math.min(100, (profile.ucat / 3600) * 100);
     const interviewScore = Math.min(100, (profile.interviewScore / 5) * 100);
-    return Math.round(atarScore * 0.4 + ucatScore * 0.35 + interviewScore * 0.25);
+    return Math.round(
+      atarScore * 0.4 + ucatScore * 0.35 + interviewScore * 0.25
+    );
   }, [profile]);
 
   const priorityActions = useMemo(() => {
-    const actions = [];
+    const actions: Array<{
+      title: string;
+      text: string;
+      tone: string;
+    }> = [];
 
-    if (profile.ucat < 2500) {
+    if (profile.ucat < 2800) {
       actions.push({
         title: "Lift UCAT competitiveness",
-        text: "Your current score leaves room to improve. Schedule more timed drills and review weak subtests weekly.",
+        text: "Build more timed sets, review weak subtests, and lock in a repeatable weekly structure.",
         tone: "border-violet-200 bg-violet-50 text-violet-900",
       });
     }
 
-    if (profile.interviewScore < 3) {
+    if (profile.interviewScore < 3.5) {
       actions.push({
         title: "Build interview consistency",
-        text: "You need more structured interview reps. Use Train regularly and aim to log feedback over time.",
+        text: "You need more structured reps. Focus on reflection quality, delivery, and timed MMI practice.",
         tone: "border-emerald-200 bg-emerald-50 text-emerald-900",
       });
     }
@@ -450,7 +653,7 @@ export default function CommandClient({
     if (profile.targetUnis.length < 3) {
       actions.push({
         title: "Shortlist target universities",
-        text: "Build a clearer shortlist so Command can surface better planning and strategic next steps.",
+        text: "A clearer shortlist will make your planning, rural strategy, and timeline far more useful.",
         tone: "border-blue-200 bg-blue-50 text-blue-900",
       });
     }
@@ -465,6 +668,8 @@ export default function CommandClient({
     };
   }, [profile]);
 
+  const dailyMotto = useMemo(() => getDailyMotto(profile.name), [profile.name]);
+
   function toggleUni(name: string) {
     setProfile((current) => ({
       ...current,
@@ -478,28 +683,40 @@ export default function CommandClient({
     setIsSavingProfile(true);
     setProfileMessage("");
 
-    const { error } = await supabase.from("command_profiles").upsert({
-      user_id: userId,
-      display_name: profile.name,
-      year_level: profile.yearLevel,
-      state: profile.state,
-      category: profile.category,
-      pathway: profile.pathway,
-      atar: profile.atar,
-      ucat: profile.ucat,
-      interview_score: profile.interviewScore,
-      target_unis: profile.targetUnis,
-      updated_at: new Date().toISOString(),
-    });
+    try {
+      const res = await fetch("/api/command/profile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: profile.name,
+          yearLevel: profile.yearLevel,
+          state: profile.state,
+          category: profile.category,
+          pathway: profile.pathway,
+          atar: profile.atar,
+          ucat: profile.ucat,
+          interviewScore: profile.interviewScore,
+          targetUnis: profile.targetUnis,
+          avatar: profile.avatar,
+        }),
+      });
 
-    if (error) {
-      setProfileMessage("Failed to save profile.");
-    } else {
+      const data = await res.json();
+
+      if (!res.ok) {
+        setProfileMessage(data?.error || "Failed to save profile.");
+        return;
+      }
+
       setProfileMessage("Profile saved.");
       setShowEdit(false);
+    } catch {
+      setProfileMessage("Failed to save profile.");
+    } finally {
+      setIsSavingProfile(false);
     }
-
-    setIsSavingProfile(false);
   }
 
   async function addCustomDate() {
@@ -579,116 +796,224 @@ export default function CommandClient({
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-8">
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60 sm:p-8">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        {siteSettings.maintenanceMode ? (
+          <section className="rounded-3xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
+                <ShieldAlert className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="font-semibold text-amber-950">
+                  Scheduled maintenance mode is active
+                </div>
+                <p className="mt-1 text-sm leading-6 text-amber-900">
+                  {siteSettings.maintenanceMessage}
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        <section className="overflow-hidden rounded-3xl border border-emerald-200 bg-linear-to-br from-emerald-500 via-teal-500 to-emerald-600 p-6 text-white shadow-sm sm:p-8">
+          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             <div>
-              <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+              <div className="inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90">
                 Personal Command Centre
               </div>
-              <h1 className="mt-4 text-4xl font-black tracking-[-0.04em] text-slate-950 sm:text-5xl">
+
+              <h1 className="mt-4 text-4xl font-black tracking-[-0.04em] sm:text-5xl">
                 ⌘ COMMAND
               </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
-                Build your profile once, keep your planning in one place, and
-                unlock deeper tracking automatically when you move onto a paid
-                plan.
+
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/90 sm:text-base">
+                Your personal planning dashboard for Australian medicine entry.
+                Cleaner. Smarter. More personal.
               </p>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <div className="rounded-2xl bg-white/12 px-4 py-3 text-sm font-semibold">
+                  {getPlanLabel(subscription.planKey)}
+                </div>
+                <div className="rounded-2xl bg-white/12 px-4 py-3 text-sm font-medium">
+                  {formatRelativeUpdate(siteSettings.commandLastUpdatedAt)}
+                </div>
+                <div className="rounded-2xl bg-white/12 px-4 py-3 text-sm font-medium">
+                  {formatDowntimeLabel(
+                    siteSettings.scheduledDowntimeStartAt,
+                    siteSettings.scheduledDowntimeEndAt
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
-                {isPremium ? "Pro active" : "Free plan"}
+            <div className="rounded-3xl border border-white/15 bg-white/10 p-5 backdrop-blur-sm">
+              <div className="flex items-center gap-4">
+                <AvatarPreview avatar={profile.avatar} />
+                <div>
+                  <div className="text-lg font-semibold">
+                    {profile.name || "Your account"}
+                  </div>
+                  <div className="text-sm text-white/85">{userEmail}</div>
+                  <div className="mt-2 inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
+                    Clerk connected
+                  </div>
+                  <div
+                    className={cn(
+                      "mt-2 inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
+                      getPlanAccent(subscription.planKey)
+                    )}
+                  >
+                    {getPlanLabel(subscription.planKey)}
+                  </div>
+                  <div className="mt-2 text-sm text-white/85">
+                    {getBillingLabel(subscription)}
+                  </div>
+                </div>
               </div>
-              {!isPremium ? (
-                <a
-                  href="/pricing"
-                  className="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white"
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button
+                  onClick={() => setShowEdit((value) => !value)}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900"
                 >
-                  <Crown className="h-4 w-4" />
-                  Unlock Pro
-                </a>
-              ) : null}
+                  <Edit3 className="h-4 w-4" />
+                  {showEdit ? "Close editor" : "Edit profile"}
+                </button>
+
+                {subscription.planKey === "free" ? (
+                  <Link
+                    href="/pricing"
+                    className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-slate-900/30 px-4 py-2.5 text-sm font-semibold text-white"
+                  >
+                    <Crown className="h-4 w-4" />
+                    Unlock Pro
+                  </Link>
+                ) : (
+                  <Link
+                    href="/pricing"
+                    className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-slate-900/30 px-4 py-2.5 text-sm font-semibold text-white"
+                  >
+                    <Crown className="h-4 w-4" />
+                    Manage billing
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500 text-lg font-bold text-white">
-                  {(profile.name || "U")[0]}
+        <section className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr_0.85fr]">
+          <SectionCard
+            title="Manu’s Motto"
+            description="A fresh daily reminder that changes every day."
+            icon={<Sparkles className="h-5 w-5 text-emerald-600" />}
+          >
+            <div className="rounded-3xl border border-emerald-200 bg-linear-to-r from-emerald-50 to-teal-50 p-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                Day {dailyMotto.dayNumber}
+              </div>
+              <p className="mt-3 text-lg font-semibold leading-8 text-slate-900">
+                {dailyMotto.text}
+              </p>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Next key date"
+            description="Your closest upcoming milestone from the Command timeline."
+            icon={<CalendarDays className="h-5 w-5 text-sky-600" />}
+          >
+            {nextEvent ? (
+              <div className={cn("rounded-3xl border p-5", EVENT_STYLES[nextEvent.type])}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-base font-semibold">{nextEvent.title}</div>
+                    <div className="mt-1 text-sm opacity-80">
+                      {formatDate(nextEvent.date)}
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold">
+                    {nextEvent.type}
+                  </span>
                 </div>
-                <div>
-                  <div className="text-base font-semibold text-slate-950">
-                    {profile.name || "Your profile"}
-                  </div>
-                  <div className="text-sm text-slate-500">
-                    {profile.yearLevel} • {profile.state} • {profile.category}
-                  </div>
+                <div className="mt-4 text-3xl font-bold tracking-tight">
+                  {daysUntil(nextEvent.date)} days
                 </div>
               </div>
+            ) : (
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
+                No upcoming dates yet.
+              </div>
+            )}
+          </SectionCard>
 
-              <button
-                onClick={() => setShowEdit((value) => !value)}
-                className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100"
-              >
-                <Edit3 className="h-4 w-4" />
-                {showEdit ? "Close editor" : "Edit profile"}
-              </button>
-            </div>
-
-            <div className="mt-5 grid gap-4 sm:grid-cols-3">
+          <SectionCard
+            title="Current focus"
+            description="The clearest planning signal from your current profile."
+            icon={<TrendingUp className="h-5 w-5 text-violet-600" />}
+          >
+            <div className="space-y-3">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                   Pathway
                 </div>
-                <div className="mt-2 text-lg font-semibold text-slate-950">
-                  {profile.pathway}
+                <div className="mt-2 text-sm font-semibold text-slate-950">
+                  {profile.pathway} from {profile.state}
                 </div>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  Target unis
+                  Shortlist
                 </div>
-                <div className="mt-2 text-lg font-semibold text-slate-950">
-                  {profile.targetUnis.length}
+                <div className="mt-2 text-sm font-semibold text-slate-950">
+                  {profile.targetUnis.length
+                    ? `${profile.targetUnis.length} saved universities`
+                    : "No shortlist saved yet"}
                 </div>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  Readiness
+                  Billing
                 </div>
-                <div className="mt-2 text-lg font-semibold text-slate-950">
-                  {readinessBand}/100
+                <div className="mt-2 text-sm font-semibold text-slate-950">
+                  {getBillingLabel(subscription)}
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
+        </section>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
-            <div className="flex items-center gap-2 text-slate-950">
-              <Target className="h-5 w-5 text-emerald-600" />
-              <h2 className="text-lg font-semibold">What Command does</h2>
-            </div>
-            <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-              <p>
-                Free users can build a real profile, save custom dates, and use
-                Command as their planning base.
-              </p>
-              <p>
-                Paid users unlock target-university tracking, weekly progress,
-                streaks, priority actions, scholarships, accommodation, and
-                experiences.
-              </p>
-            </div>
-          </div>
+        <section className="grid gap-4 lg:grid-cols-4">
+          <StatCard
+            title="ATAR"
+            value={String(profile.atar)}
+            caption="Current estimate"
+            tone="border-blue-200 bg-blue-50 text-blue-950"
+          />
+          <StatCard
+            title="UCAT"
+            value={String(profile.ucat)}
+            caption="Best score so far"
+            tone="border-violet-200 bg-violet-50 text-violet-950"
+          />
+          <StatCard
+            title="Interview"
+            value={`${profile.interviewScore.toFixed(1)}/5`}
+            caption="Current self-rating"
+            tone="border-emerald-200 bg-emerald-50 text-emerald-950"
+          />
+          <StatCard
+            title="Readiness"
+            value={`${readinessBand}/100`}
+            caption="Blended dashboard score"
+            tone="border-slate-200 bg-slate-50 text-slate-950"
+          />
         </section>
 
         {showEdit ? (
           <SectionCard
             title="Edit your Command profile"
-            description="This is saved to your account so your dashboard feels personal from the start."
+            description="Saved to your account so your dashboard feels personal from the start."
             icon={<UserRound className="h-5 w-5" />}
             action={
               <button
@@ -700,7 +1025,7 @@ export default function CommandClient({
             }
           >
             <div className="grid gap-4 md:grid-cols-3">
-              <label className="space-y-2 md:col-span-3">
+              <label className="space-y-2 md:col-span-2">
                 <span className="text-sm font-medium text-slate-700">
                   Display name
                 </span>
@@ -710,6 +1035,17 @@ export default function CommandClient({
                     setProfile({ ...profile, name: e.target.value })
                   }
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Email
+                </span>
+                <input
+                  value={userEmail}
+                  disabled
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500"
                 />
               </label>
 
@@ -840,16 +1176,55 @@ export default function CommandClient({
 
             <div className="mt-8">
               <div className="text-base font-semibold text-slate-950">
+                Choose your profile icon
+              </div>
+              <p className="mt-1 text-sm text-slate-500">
+                A small but important personal touch for the Command page.
+              </p>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                {AVATARS.map((avatar) => {
+                  const Icon = avatar.icon;
+                  const active = profile.avatar === avatar.id;
+
+                  return (
+                    <button
+                      key={avatar.id}
+                      type="button"
+                      onClick={() =>
+                        setProfile({ ...profile, avatar: avatar.id })
+                      }
+                      className={cn(
+                        "rounded-3xl border p-4 text-left transition",
+                        active
+                          ? "border-emerald-300 bg-emerald-50"
+                          : "border-slate-200 bg-slate-50 hover:bg-slate-100"
+                      )}
+                    >
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-800 shadow-sm">
+                        <Icon className="h-6 w-6" />
+                      </div>
+                      <div className="mt-3 text-sm font-semibold text-slate-900">
+                        {avatar.label}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <div className="text-base font-semibold text-slate-950">
                 Target universities
               </div>
               <p className="mt-1 text-sm text-slate-500">
-                Save these now. They become much more powerful once Pro is
-                unlocked.
+                Save your shortlist so Command can personalise your planning.
               </p>
 
               <div className="mt-4 grid max-h-96 gap-3 overflow-auto pr-2 md:grid-cols-3">
                 {ALL_UNIS.map((uni) => {
                   const selected = profile.targetUnis.includes(uni);
+
                   return (
                     <button
                       key={uni}
@@ -911,43 +1286,10 @@ export default function CommandClient({
           </SectionCard>
         ) : null}
 
-        <SectionCard
-          title="Application readiness"
-          description="A quick snapshot of where you currently stand."
-          icon={<CheckCircle2 className="h-5 w-5 text-emerald-600" />}
-        >
-          <div className="grid gap-4 lg:grid-cols-4">
-            <StatCard
-              title="ATAR"
-              value={String(profile.atar)}
-              caption="Current estimate"
-              tone="border-blue-200 bg-blue-50 text-blue-950"
-            />
-            <StatCard
-              title="UCAT"
-              value={String(profile.ucat)}
-              caption="Best score so far"
-              tone="border-violet-200 bg-violet-50 text-violet-950"
-            />
-            <StatCard
-              title="Interview"
-              value={`${profile.interviewScore.toFixed(1)}/5`}
-              caption="Current self-rating"
-              tone="border-emerald-200 bg-emerald-50 text-emerald-950"
-            />
-            <StatCard
-              title="Readiness"
-              value={`${readinessBand}/100`}
-              caption="Blended dashboard score"
-              tone="border-slate-200 bg-slate-50 text-slate-950"
-            />
-          </div>
-        </SectionCard>
-
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
           <SectionCard
             title="Key dates calendar"
-            description="Save personal checkpoints alongside core med admissions dates."
+            description="Core med dates plus your own personal deadlines."
             icon={<CalendarDays className="h-5 w-5 text-sky-600" />}
             action={
               <div className="flex flex-wrap gap-2">
@@ -975,7 +1317,10 @@ export default function CommandClient({
                 {upcoming.map((event) => (
                   <div
                     key={event.id}
-                    className={cn("rounded-2xl border p-4", EVENT_STYLES[event.type])}
+                    className={cn(
+                      "rounded-2xl border p-4",
+                      EVENT_STYLES[event.type]
+                    )}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -1041,7 +1386,7 @@ export default function CommandClient({
                       setDraftDate({ ...draftDate, notes: e.target.value })
                     }
                     placeholder="Optional notes"
-                    className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
+                    className="min-h-32 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
                   />
                   <button
                     onClick={addCustomDate}
@@ -1096,207 +1441,252 @@ export default function CommandClient({
             ) : null}
           </SectionCard>
 
-          <SectionCard
-            title="Core planning view"
-            description="A simple place to keep your direction clear even on the free plan."
-            icon={<TrendingUp className="h-5 w-5 text-violet-600" />}
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                <div className="flex items-center gap-2 text-slate-950">
-                  <GraduationCap className="h-4 w-4 text-blue-600" />
-                  <span className="font-semibold">Pathway focus</span>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  You are currently focused on the{" "}
-                  <span className="font-semibold text-slate-950">
-                    {profile.pathway}
-                  </span>{" "}
-                  route from{" "}
-                  <span className="font-semibold text-slate-950">
-                    {profile.state}
-                  </span>
-                  .
-                </p>
-              </div>
-
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                <div className="flex items-center gap-2 text-slate-950">
-                  <MapPinned className="h-4 w-4 text-emerald-600" />
-                  <span className="font-semibold">Current shortlist</span>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {profile.targetUnis.length ? (
-                    profile.targetUnis.slice(0, 6).map((uni) => (
-                      <span
-                        key={uni}
-                        className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700"
-                      >
-                        {uni}
-                      </span>
-                    ))
-                  ) : (
-                    <p className="text-sm text-slate-500">
-                      No target universities saved yet.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </SectionCard>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <ProCard
-            title="Target universities"
-            description="Competitiveness tracking against your shortlist."
-            icon={<Target className="h-5 w-5" />}
-            unlocked={isPremium}
-          >
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-blue-950">
-              <div className="text-sm font-semibold">Shortlisted universities</div>
-              <div className="mt-2 text-4xl font-bold">
-                {profile.targetUnis.length}
-              </div>
-              <p className="mt-2 text-sm">
-                Your shortlist is saved and ready for deeper comparison.
-              </p>
-            </div>
-          </ProCard>
-
-          <ProCard
-            title="Weekly progress"
-            description="See consistency across UCAT and interview prep."
-            icon={<TrendingUp className="h-5 w-5" />}
-            unlocked={isPremium}
-          >
-            <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div>
-                <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="font-medium text-slate-700">UCAT momentum</span>
-                  <span className="text-slate-500">
-                    {Math.round(weeklyProgress.ucat)}%
-                  </span>
-                </div>
-                <div className="h-2 rounded-full bg-slate-200">
-                  <div
-                    className="h-2 rounded-full bg-violet-600"
-                    style={{ width: `${weeklyProgress.ucat}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="font-medium text-slate-700">
-                    Interview consistency
-                  </span>
-                  <span className="text-slate-500">
-                    {Math.round(weeklyProgress.interview)}%
-                  </span>
-                </div>
-                <div className="h-2 rounded-full bg-slate-200">
-                  <div
-                    className="h-2 rounded-full bg-emerald-600"
-                    style={{ width: `${weeklyProgress.interview}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </ProCard>
-
-          <ProCard
-            title="Streak tracker"
-            description="Stay consistent and keep your momentum visible."
-            icon={<Flame className="h-5 w-5" />}
-            unlocked={isPremium}
-          >
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
-              <div className="flex items-center gap-2">
-                <Flame className="h-5 w-5" />
-                <div className="text-xl font-bold">1-week streak</div>
-              </div>
-              <p className="mt-2 text-sm">
-                Keep showing up. Command will reward consistency over intensity.
-              </p>
-            </div>
-          </ProCard>
-
-          <ProCard
-            title="Priority actions"
-            description="The highest-value next steps based on your profile."
-            icon={<Sparkles className="h-5 w-5" />}
-            unlocked={isPremium}
-          >
-            <div className="space-y-3">
-              {priorityActions.length ? (
-                priorityActions.map((action) => (
-                  <div
-                    key={action.title}
-                    className={cn("rounded-2xl border p-4", action.tone)}
-                  >
-                    <div className="font-semibold">{action.title}</div>
-                    <div className="mt-1 text-sm">{action.text}</div>
+          <div className="space-y-4">
+            <SectionCard
+              title="Core planning view"
+              description="Your direction, momentum, and next moves in one place."
+              icon={<TrendingUp className="h-5 w-5 text-violet-600" />}
+            >
+              <div className="space-y-4">
+                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="flex items-center gap-2 text-slate-950">
+                    <GraduationCap className="h-4 w-4 text-blue-600" />
+                    <span className="font-semibold">Pathway focus</span>
                   </div>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  No urgent actions right now.
+                  <p className="mt-3 text-sm leading-6 text-slate-600">
+                    You are currently focused on the{" "}
+                    <span className="font-semibold text-slate-950">
+                      {profile.pathway}
+                    </span>{" "}
+                    route from{" "}
+                    <span className="font-semibold text-slate-950">
+                      {profile.state}
+                    </span>
+                    .
+                  </p>
                 </div>
-              )}
-            </div>
-          </ProCard>
 
-          <ProCard
-            title="Scholarships"
-            description="Save and track scholarship opportunities."
-            icon={<Award className="h-5 w-5" />}
-            unlocked={isPremium}
-          >
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-slate-900">
-                  Saved scholarships
-                </span>
-                <span className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700">
-                  0
-                </span>
-              </div>
-              <p className="mt-3 text-sm text-slate-500">
-                Start building your funding plan in one place.
-              </p>
-            </div>
-          </ProCard>
-
-          <ProCard
-            title="Accommodation + experiences"
-            description="Keep relocation planning and experiences organised."
-            icon={<House className="h-5 w-5" />}
-            unlocked={isPremium}
-          >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center gap-2 font-semibold text-slate-900">
-                  <House className="h-4 w-4 text-violet-600" />
-                  Accommodation
+                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="flex items-center gap-2 text-slate-950">
+                    <MapPinned className="h-4 w-4 text-emerald-600" />
+                    <span className="font-semibold">Current shortlist</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {profile.targetUnis.length ? (
+                      profile.targetUnis.slice(0, 8).map((uni) => (
+                        <span
+                          key={uni}
+                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700"
+                        >
+                          {uni}
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-500">
+                        No target universities saved yet.
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <p className="mt-2 text-sm text-slate-500">
-                  Save options, costs, and location preferences.
-                </p>
-              </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center gap-2 font-semibold text-slate-900">
-                  <Gift className="h-4 w-4 text-emerald-600" />
-                  Experiences
+                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="flex items-center gap-2 text-slate-950">
+                    <Clock3 className="h-4 w-4 text-amber-600" />
+                    <span className="font-semibold">Priority actions</span>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {priorityActions.length ? (
+                      priorityActions.map((action) => (
+                        <div
+                          key={action.title}
+                          className={cn("rounded-2xl border p-4", action.tone)}
+                        >
+                          <div className="font-semibold">{action.title}</div>
+                          <div className="mt-1 text-sm">{action.text}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                        No urgent actions right now.
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <p className="mt-2 text-sm text-slate-500">
-                  Track volunteering, leadership, and work experience.
-                </p>
               </div>
-            </div>
-          </ProCard>
+            </SectionCard>
+
+            <SectionCard
+              title="System status"
+              description="Live trust signals for dashboard freshness and downtime."
+              icon={<Wrench className="h-5 w-5 text-slate-700" />}
+            >
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Last updated
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-slate-950">
+                    {formatRelativeUpdate(siteSettings.commandLastUpdatedAt)}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Scheduled downtime
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-slate-950">
+                    {formatDowntimeLabel(
+                      siteSettings.scheduledDowntimeStartAt,
+                      siteSettings.scheduledDowntimeEndAt
+                    )}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {formatDowntimeDetail(
+                      siteSettings.scheduledDowntimeStartAt,
+                      siteSettings.scheduledDowntimeEndAt
+                    )}
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+          </div>
         </div>
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-950">Pro tools</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Premium planning modules that sit on top of your core free dashboard.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <ProCard
+              title="Target universities"
+              description="Competitiveness tracking against your shortlist."
+              icon={<Target className="h-5 w-5" />}
+              unlocked={isPremium}
+            >
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-blue-950">
+                <div className="text-sm font-semibold">Shortlisted universities</div>
+                <div className="mt-2 text-4xl font-bold">
+                  {profile.targetUnis.length}
+                </div>
+                <p className="mt-2 text-sm">
+                  Your shortlist is saved and ready for deeper comparison.
+                </p>
+              </div>
+            </ProCard>
+
+            <ProCard
+              title="Weekly progress"
+              description="See consistency across UCAT and interview prep."
+              icon={<TrendingUp className="h-5 w-5" />}
+              unlocked={isPremium}
+            >
+              <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div>
+                  <div className="mb-2 flex items-center justify-between text-sm">
+                    <span className="font-medium text-slate-700">UCAT momentum</span>
+                    <span className="text-slate-500">
+                      {Math.round(weeklyProgress.ucat)}%
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-200">
+                    <div
+                      className="h-2 rounded-full bg-violet-600"
+                      style={{ width: `${weeklyProgress.ucat}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between text-sm">
+                    <span className="font-medium text-slate-700">
+                      Interview consistency
+                    </span>
+                    <span className="text-slate-500">
+                      {Math.round(weeklyProgress.interview)}%
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-200">
+                    <div
+                      className="h-2 rounded-full bg-emerald-600"
+                      style={{ width: `${weeklyProgress.interview}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </ProCard>
+
+            <ProCard
+              title="Streak tracker"
+              description="Stay consistent and keep your momentum visible."
+              icon={<Flame className="h-5 w-5" />}
+              unlocked={isPremium}
+            >
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+                <div className="flex items-center gap-2">
+                  <Flame className="h-5 w-5" />
+                  <div className="text-xl font-bold">1-week streak</div>
+                </div>
+                <p className="mt-2 text-sm">
+                  Keep showing up. Command rewards consistency over random bursts.
+                </p>
+              </div>
+            </ProCard>
+
+            <ProCard
+              title="Scholarships"
+              description="Save and track scholarship opportunities."
+              icon={<Award className="h-5 w-5" />}
+              unlocked={isPremium}
+            >
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-900">
+                    Saved scholarships
+                  </span>
+                  <span className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700">
+                    0
+                  </span>
+                </div>
+                <p className="mt-3 text-sm text-slate-500">
+                  Build your funding plan in one place.
+                </p>
+              </div>
+            </ProCard>
+
+            <ProCard
+              title="Accommodation + experiences"
+              description="Keep relocation planning and experiences organised."
+              icon={<House className="h-5 w-5" />}
+              unlocked={isPremium}
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center gap-2 font-semibold text-slate-900">
+                    <House className="h-4 w-4 text-violet-600" />
+                    Accommodation
+                  </div>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Save options, costs, and location preferences.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center gap-2 font-semibold text-slate-900">
+                    <Gift className="h-4 w-4 text-emerald-600" />
+                    Experiences
+                  </div>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Track volunteering, leadership, and work experience.
+                  </p>
+                </div>
+              </div>
+            </ProCard>
+          </div>
+        </section>
       </div>
     </main>
   );

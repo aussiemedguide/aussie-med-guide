@@ -17,7 +17,7 @@ type Plan = {
   buttonTone: string;
   cta: string;
   href?: string;
-  planKey?: "monthly" | "annual";
+  planKey?: "pro_monthly" | "pro_annual";
   features: string[];
   note?: string;
 };
@@ -53,7 +53,7 @@ const plans: Plan[] = [
     tone: "border-blue-300 bg-blue-50/40",
     buttonTone: "bg-blue-600 text-white hover:bg-blue-700",
     cta: "Continue to payment",
-    planKey: "monthly",
+    planKey: "pro_monthly",
     features: [
       "Personalised Roadmap Score and Competitiveness Intel",
       "Custom roadmap based on your Year and Targets",
@@ -77,7 +77,7 @@ const plans: Plan[] = [
     tone: "border-emerald-300 bg-emerald-50/50",
     buttonTone: "bg-emerald-600 text-white hover:bg-emerald-700",
     cta: "Continue to payment",
-    planKey: "annual",
+    planKey: "pro_annual",
     features: [
       "Everything in Pro Monthly",
       "Lowest effective price for the year",
@@ -122,7 +122,7 @@ function PricingCard({
 }: {
   plan: Plan;
   featured?: boolean;
-  onCheckout: (plan: "monthly" | "annual", accepted: boolean) => void;
+  onCheckout: (plan: "pro_monthly" | "pro_annual", accepted: boolean) => void;
   loadingPlan: string | null;
   isSignedIn: boolean;
 }) {
@@ -220,7 +220,7 @@ function PricingCard({
 
           <button
             type="button"
-            onClick={() => onCheckout(plan.planKey!, accepted)}
+            onClick={() => plan.planKey && onCheckout(plan.planKey, accepted)}
             disabled={isLoading || !accepted}
             className={cx(
               "mt-6 inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70",
@@ -236,7 +236,7 @@ function PricingCard({
         </>
       ) : (
         <Link
-          href={plan.href!}
+          href={plan.href ?? "/"}
           className={cx(
             "mt-6 inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
             plan.buttonTone
@@ -294,7 +294,7 @@ export default function PricingPage() {
     }
   }
 
-  async function createCheckout(plan: "monthly" | "annual") {
+  async function createCheckout(plan: "pro_monthly" | "pro_annual") {
     const res = await fetch("/api/stripe/checkout", {
       method: "POST",
       headers: {
@@ -317,7 +317,7 @@ export default function PricingPage() {
   }
 
   const handleCheckout = async (
-    plan: "monthly" | "annual",
+    plan: "pro_monthly" | "pro_annual",
     accepted: boolean
   ) => {
     if (!accepted) {
@@ -369,7 +369,7 @@ export default function PricingPage() {
       const pendingAccepted = localStorage.getItem("pendingCheckoutAccepted");
 
       if (!pendingPlan || pendingAccepted !== "true") return;
-      if (pendingPlan !== "monthly" && pendingPlan !== "annual") return;
+      if (pendingPlan !== "pro_monthly" && pendingPlan !== "pro_annual") return;
 
       hasResumedRef.current = true;
 

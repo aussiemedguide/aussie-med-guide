@@ -1,6 +1,10 @@
-import { PricingCard } from "@/components/pricing/pricing-card";
+import { auth, currentUser } from "@clerk/nextjs/server";
+import { PricingFlow } from "@/components/pricing/pricing-flow";
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const { userId } = await auth();
+  const user = await currentUser();
+
   return (
     <main className="min-h-screen bg-slate-50">
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
@@ -14,23 +18,14 @@ export default function PricingPage() {
           </h1>
 
           <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
-            Transparent pricing. Clear billing. No confusing surprises.
+            One clean account. One clear plan. No messy billing logic.
           </p>
         </div>
 
-        <div className="mx-auto mt-12 grid max-w-4xl gap-6 md:grid-cols-2">
-          <PricingCard
-            planName="Pro Monthly"
-            priceLabel="$9.99 / month"
-            plan="monthly"
-          />
-
-          <PricingCard
-            planName="Pro Annual"
-            priceLabel="$99.99 / year"
-            plan="annual"
-          />
-        </div>
+        <PricingFlow
+          isSignedIn={!!userId}
+          userEmail={user?.emailAddresses?.[0]?.emailAddress ?? ""}
+        />
       </section>
     </main>
   );

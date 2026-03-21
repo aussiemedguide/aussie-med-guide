@@ -1354,8 +1354,8 @@ export default function MedicalSchoolsPage() {
       return [...current, id];
     });
   };
-return (
-  <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.10),transparent_24%),radial-gradient(circle_at_right,rgba(59,130,246,0.08),transparent_28%),linear-gradient(180deg,#f8fafc_0%,#f6f7fb_42%,#f8fafc_100%)] text-slate-900">
+return <> (
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.10),transparent_24%),radial-gradient(circle_at_right,rgba(59,130,246,0.08),transparent_28%),linear-gradient(180deg,#f8fafc_0%,#f6f7fb_42%,#f8fafc_100%)] text-slate-900">
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-700 shadow-sm">
@@ -1691,5 +1691,16 @@ return (
       </div>
     </div>
   </div>
-);
+
+  {showCompareModal && compareSchools.length === 2 ? (
+    <CompareModal
+      schools={compareSchools}
+      onClose={() => setShowCompareModal(false)}
+      onRemove={(id) => {
+        setCompareIds((current) => current.filter((x) => x !== id));
+        setShowCompareModal(false);
+      }}
+    />
+  ) : null}
+</>
 }
