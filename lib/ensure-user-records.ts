@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type EnsureUserRecordsParams = {
   clerkUserId: string;
@@ -11,7 +11,7 @@ export async function ensureUserRecords({
   email,
   fullName,
 }: EnsureUserRecordsParams) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const [profileRes, subscriptionRes] = await Promise.all([
     supabase

@@ -1,8 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { hasPremiumAccessFromSubscription } from "@/lib/access";
 
 export async function getUserAccess(clerkUserId: string) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: subscription, error } = await supabase
     .from("subscriptions")

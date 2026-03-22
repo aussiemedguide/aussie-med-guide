@@ -1,6 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
 import CommandClient from "./command-client";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAuth } from "@/lib/require-auth";
 import { getUserAccess } from "@/lib/get-user-access";
 
@@ -102,7 +102,7 @@ export default async function CommandPage() {
   });
 
   const clerkUser = await currentUser();
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   const [{ subscription }, profileRes, eventsRes, settingsRes] =
     await Promise.all([
