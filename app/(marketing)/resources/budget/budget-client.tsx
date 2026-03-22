@@ -181,7 +181,7 @@ export default function BudgetClient({ isPremium }: { isPremium: boolean }) {
       locked={!isPremium}
       title="Upgrade to unlock Budget Planner"
       description="Compare college vs private living costs with full customisation and realistic budgeting tools."
-      ctaHref="/upgrade"
+      ctaHref="/info/pricing"
       ctaLabel="Upgrade to Pro"
       previewLabel="Budget Planner"
     >

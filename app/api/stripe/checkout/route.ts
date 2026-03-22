@@ -80,7 +80,11 @@ export async function POST(req: Request) {
             clerk_user_id: userId,
             plan: "free",
             status: "free",
+            stripe_customer_id: null,
+            stripe_subscription_id: null,
+            stripe_price_id: null,
             cancel_at_period_end: false,
+            current_period_end: null,
           })
           .select("*")
           .single();
@@ -99,7 +103,19 @@ export async function POST(req: Request) {
       subscription = createdSubscription;
     }
 
-    let stripeCustomerId: string | null = subscription?.stripe_customer_id ?? null;
+    const alreadyOnRequestedPlan =
+      subscription?.plan === plan &&
+      (subscription?.status === "active" || subscription?.status === "trialing");
+
+    if (alreadyOnRequestedPlan) {
+      return NextResponse.json(
+        { error: "You are already on this plan." },
+        { status: 400 }
+      );
+    }
+
+    let stripeCustomerId: string | null =
+      subscription?.stripe_customer_id ?? null;
 
     if (stripeCustomerId) {
       try {
@@ -107,6 +123,13 @@ export async function POST(req: Request) {
 
         if ("deleted" in existingCustomer && existingCustomer.deleted) {
           stripeCustomerId = null;
+        } else {
+          await stripe.customers.update(stripeCustomerId, {
+            email,
+            metadata: {
+              clerk_user_id: userId,
+            },
+          });
         }
       } catch {
         stripeCustomerId = null;
@@ -152,6 +175,7 @@ export async function POST(req: Request) {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: stripeCustomerId,
+      client_reference_id: userId,
       line_items: [
         {
           price: priceId,

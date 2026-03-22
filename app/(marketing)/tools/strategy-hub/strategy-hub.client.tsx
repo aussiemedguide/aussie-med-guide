@@ -751,7 +751,7 @@ export default function StrategyHubClient({
       locked={!isPremium}
       title="Upgrade to unlock Strategy Hub"
       description="Access the full strategy hub for pathway planning, rural and equity tools, contingency planning, and financial strategy."
-      ctaHref="/upgrade"
+      ctaHref="/info/pricing"
       ctaLabel="Upgrade to Pro"
       previewLabel="Strategy Hub"
     >

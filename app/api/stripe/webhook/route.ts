@@ -11,43 +11,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-async function upsertSubscriptionRecord(params: {
-  clerkUserId: string;
-  stripeCustomerId?: string | null;
-  stripeSubscriptionId?: string | null;
-  subscriptionStatus: string;
-  plan: string;
-  currentPeriodEnd?: string | null;
-}) {
-  const {
-    clerkUserId,
-    stripeCustomerId,
-    stripeSubscriptionId,
-    subscriptionStatus,
-    plan,
-    currentPeriodEnd,
-  } = params;
+type AppPlan = "free" | "pro_monthly" | "pro_annual";
 
-  const { error } = await supabase.from("user_subscriptions").upsert(
-    {
-      clerk_user_id: clerkUserId,
-      stripe_customer_id: stripeCustomerId ?? null,
-      stripe_subscription_id: stripeSubscriptionId ?? null,
-      subscription_status: subscriptionStatus,
-      plan,
-      current_period_end: currentPeriodEnd ?? null,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "clerk_user_id" }
-  );
-
-  if (error) throw error;
-}
-
-function getPlanFromPriceId(priceId?: string | null) {
+function getPlanFromPriceId(priceId?: string | null): AppPlan {
   if (!priceId) return "free";
-  if (priceId === process.env.STRIPE_PRO_MONTHLY) return "monthly";
-  if (priceId === process.env.STRIPE_PRO_ANNUAL) return "annual";
+  if (priceId === process.env.STRIPE_PRO_MONTHLY) return "pro_monthly";
+  if (priceId === process.env.STRIPE_PRO_ANNUAL) return "pro_annual";
   return "free";
 }
 
@@ -55,17 +24,66 @@ async function getClerkUserIdFromCustomer(customerId?: string | null) {
   if (!customerId) return null;
 
   const { data, error } = await supabase
-    .from("user_subscriptions")
+    .from("subscriptions")
     .select("clerk_user_id")
     .eq("stripe_customer_id", customerId)
     .maybeSingle();
 
   if (error) {
-    console.error("Failed to find clerk user from stripe customer:", error);
+    console.error("Failed to resolve clerk user from Stripe customer:", error);
     return null;
   }
 
   return data?.clerk_user_id ?? null;
+}
+
+async function upsertSubscriptionRecord(params: {
+  clerkUserId: string;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+  stripePriceId?: string | null;
+  plan: AppPlan;
+  status:
+    | "free"
+    | "trialing"
+    | "active"
+    | "past_due"
+    | "canceled"
+    | "unpaid"
+    | "incomplete"
+    | "incomplete_expired";
+  cancelAtPeriodEnd?: boolean;
+  currentPeriodEnd?: string | null;
+}) {
+  const {
+    clerkUserId,
+    stripeCustomerId,
+    stripeSubscriptionId,
+    stripePriceId,
+    plan,
+    status,
+    cancelAtPeriodEnd = false,
+    currentPeriodEnd = null,
+  } = params;
+
+  const { error } = await supabase.from("subscriptions").upsert(
+    {
+      clerk_user_id: clerkUserId,
+      stripe_customer_id: stripeCustomerId ?? null,
+      stripe_subscription_id: stripeSubscriptionId ?? null,
+      stripe_price_id: stripePriceId ?? null,
+      plan,
+      status,
+      cancel_at_period_end: cancelAtPeriodEnd,
+      current_period_end: currentPeriodEnd,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "clerk_user_id" }
+  );
+
+  if (error) {
+    throw error;
+  }
 }
 
 export async function POST(req: Request) {
@@ -110,19 +128,34 @@ export async function POST(req: Request) {
           typeof session.customer === "string" ? session.customer : null;
         const stripeSubscriptionId =
           typeof session.subscription === "string" ? session.subscription : null;
-        const plan = session.metadata?.plan ?? "free";
+        const plan = (session.metadata?.plan as AppPlan | undefined) ?? "free";
 
         if (!clerkUserId) {
           console.warn("Missing clerk_user_id in checkout session metadata");
           break;
         }
 
+        let stripePriceId: string | null = null;
         let currentPeriodEnd: string | null = null;
+        let cancelAtPeriodEnd = false;
+        let status:
+          | "free"
+          | "trialing"
+          | "active"
+          | "past_due"
+          | "canceled"
+          | "unpaid"
+          | "incomplete"
+          | "incomplete_expired" = "active";
 
         if (stripeSubscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(
             stripeSubscriptionId
           );
+
+          stripePriceId = subscription.items.data[0]?.price?.id ?? null;
+          status = subscription.status as typeof status;
+          cancelAtPeriodEnd = subscription.cancel_at_period_end ?? false;
 
           const periodEnd = (subscription as Stripe.Subscription & {
             current_period_end?: number;
@@ -137,8 +170,10 @@ export async function POST(req: Request) {
           clerkUserId,
           stripeCustomerId,
           stripeSubscriptionId,
-          subscriptionStatus: "active",
-          plan,
+          stripePriceId,
+          plan: stripePriceId ? getPlanFromPriceId(stripePriceId) : plan,
+          status,
+          cancelAtPeriodEnd,
           currentPeriodEnd,
         });
 
@@ -158,8 +193,13 @@ export async function POST(req: Request) {
           clerkUserId = await getClerkUserIdFromCustomer(stripeCustomerId);
         }
 
-        const priceId = subscription.items.data[0]?.price?.id ?? null;
-        const plan = subscription.metadata?.plan || getPlanFromPriceId(priceId);
+        if (!clerkUserId) {
+          console.warn("Could not resolve clerk_user_id for subscription event");
+          break;
+        }
+
+        const stripePriceId = subscription.items.data[0]?.price?.id ?? null;
+        const plan = getPlanFromPriceId(stripePriceId);
 
         const periodEnd = (subscription as Stripe.Subscription & {
           current_period_end?: number;
@@ -169,17 +209,22 @@ export async function POST(req: Request) {
           ? new Date(periodEnd * 1000).toISOString()
           : null;
 
-        if (!clerkUserId) {
-          console.warn("Could not resolve clerk_user_id for subscription event");
-          break;
-        }
-
         await upsertSubscriptionRecord({
           clerkUserId,
           stripeCustomerId,
           stripeSubscriptionId: subscription.id,
-          subscriptionStatus: subscription.status,
+          stripePriceId,
           plan,
+          status: subscription.status as
+            | "free"
+            | "trialing"
+            | "active"
+            | "past_due"
+            | "canceled"
+            | "unpaid"
+            | "incomplete"
+            | "incomplete_expired",
+          cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
           currentPeriodEnd,
         });
 
@@ -207,8 +252,10 @@ export async function POST(req: Request) {
           clerkUserId,
           stripeCustomerId,
           stripeSubscriptionId: subscription.id,
-          subscriptionStatus: "canceled",
+          stripePriceId: subscription.items.data[0]?.price?.id ?? null,
           plan: "free",
+          status: "canceled",
+          cancelAtPeriodEnd: false,
           currentPeriodEnd: null,
         });
 

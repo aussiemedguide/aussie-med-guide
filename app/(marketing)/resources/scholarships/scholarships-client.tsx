@@ -684,7 +684,7 @@ export default function ScholarshipsClient({
           locked={!hasScholarshipsAccess}
           title="Upgrade to unlock Scholarships"
           description="Browse the full scholarship database, track applications, and build a stronger funding strategy with Pro."
-          ctaHref="/upgrade"
+          ctaHref="/info/pricing"
           ctaLabel="Upgrade to Pro"
           previewLabel="Scholarships"
         >

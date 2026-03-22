@@ -2196,7 +2196,7 @@ export default function StudyEngineClient({
       locked={!isPremium}
       title="Upgrade to unlock Study Engine"
       description="Access the full subject strategy engine, internals tracker, and external exam sensitivity tools."
-      ctaHref="/upgrade"
+      ctaHref="/info/pricing"
       ctaLabel="Upgrade to Pro"
       previewLabel="Study Engine"
     >

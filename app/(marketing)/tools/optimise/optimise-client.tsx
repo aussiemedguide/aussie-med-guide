@@ -1549,7 +1549,7 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
       locked={!isPremium}
       title="Upgrade to unlock Optimise"
       description="Use the full strategy engine for bonded decisions, preference ordering, interview planning, competitiveness insights, and scenario testing."
-      ctaHref="/upgrade"
+      ctaHref="/info/pricing"
       ctaLabel="Upgrade to Pro"
       previewLabel="Optimise"
     >

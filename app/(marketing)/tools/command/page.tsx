@@ -1,7 +1,8 @@
-import { redirect } from "next/navigation";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@clerk/nextjs/server";
 import CommandClient from "./command-client";
 import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/require-auth";
+import { getUserAccess } from "@/lib/get-user-access";
 
 type EventType =
   | "ucat"
@@ -96,17 +97,16 @@ const DEFAULT_SUBSCRIPTION: SubscriptionInfo = {
 };
 
 export default async function CommandPage() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    redirect("/sign-in?redirect_url=/tools/command");
-  }
+  const { userId } = await requireAuth({
+    signInRedirect: "/sign-in?redirect_url=/tools/command",
+  });
 
   const clerkUser = await currentUser();
   const supabase = await createClient();
 
-  const [profileRes, eventsRes, subscriptionRes, settingsRes] =
+  const [{ subscription }, profileRes, eventsRes, settingsRes] =
     await Promise.all([
+      getUserAccess(userId),
       supabase
         .from("profiles")
         .select(
@@ -120,11 +120,6 @@ export default async function CommandPage() {
         .eq("user_id", userId)
         .order("date", { ascending: true }),
       supabase
-        .from("subscriptions")
-        .select("plan, status, current_period_end, cancel_at_period_end")
-        .eq("clerk_user_id", userId)
-        .maybeSingle(),
-      supabase
         .from("site_settings")
         .select("value")
         .eq("key", "command_status")
@@ -133,7 +128,6 @@ export default async function CommandPage() {
 
   const profile = profileRes.data;
   const events = eventsRes.data ?? [];
-  const subscription = subscriptionRes.data;
   const commandStatus = (settingsRes.data?.value ?? {}) as Partial<CommandStatusValue>;
 
   const initialProfile: Profile = {
@@ -171,16 +165,18 @@ export default async function CommandPage() {
     source: (event.source as "system" | "custom") ?? "custom",
   }));
 
-  const subscriptionInfo: SubscriptionInfo = {
-    planKey:
-      subscription?.plan === "pro_monthly" ||
-      subscription?.plan === "pro_annual"
-        ? subscription.plan
-        : "free",
-    status: (subscription?.status as SubscriptionInfo["status"]) ?? "free",
-    currentPeriodEnd: subscription?.current_period_end ?? null,
-    cancelAtPeriodEnd: subscription?.cancel_at_period_end ?? false,
-  };
+  const subscriptionInfo: SubscriptionInfo = subscription
+    ? {
+        planKey:
+          subscription.plan === "pro_monthly" ||
+          subscription.plan === "pro_annual"
+            ? subscription.plan
+            : "free",
+        status: (subscription.status as SubscriptionInfo["status"]) ?? "free",
+        currentPeriodEnd: subscription.current_period_end ?? null,
+        cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
+      }
+    : DEFAULT_SUBSCRIPTION;
 
   const siteSettings: SiteSettings = {
     commandLastUpdatedAt:

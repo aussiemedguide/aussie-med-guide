@@ -16,8 +16,6 @@ import {
   Globe,
   GraduationCap,
   HeartHandshake,
-  Home,
-  Info,
   LineChart,
   ListChecks,
   Search,
@@ -32,6 +30,7 @@ import {
   Map,
   Calculator,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 type RoadmapStageKey = "year10_11" | "year12" | "gap" | "grad";
 
@@ -39,7 +38,7 @@ type CardItem = {
   title: string;
   description: string;
   href: string;
-  icon: any;
+  icon: LucideIcon;
   color: string;
   badge?: string;
 };
@@ -221,7 +220,7 @@ const toolCards: CardItem[] = [
   {
     title: "Command",
     description: "Your personal dashboard.",
-    href: "/command",
+    href: "/tools/command",
     icon: Stethoscope,
     color: "from-slate-600 to-slate-800",
     badge: "PRO",
@@ -257,7 +256,10 @@ const roadmapData: Record<RoadmapStageKey, StageData> = {
     actions: [
       { label: "Choose Subjects Strategically", href: "/explore/pathway" },
       { label: "Understand Pathways Early", href: "/explore/choose-your-uni" },
-      { label: "Check Student Classification", href: "/explore/student-classification" },
+      {
+        label: "Check Student Classification",
+        href: "/explore/student-classification",
+      },
     ],
     priorities: [
       "Choose prerequisite subjects early. Chemistry is non-negotiable in most states.",
@@ -315,7 +317,8 @@ const roadmapData: Record<RoadmapStageKey, StageData> = {
       "Ignoring ATAR ceiling of your subject combination",
       "Assuming rural pathways are a last resort",
     ],
-    needle: "Subject selection and study habit formation. These compound over two years.",
+    needle:
+      "Subject selection and study habit formation. These compound over two years.",
   },
   year12: {
     label: "Year 12",
@@ -398,7 +401,8 @@ const roadmapData: Record<RoadmapStageKey, StageData> = {
       "Neglecting interview preparation until after offers",
       "Sacrificing sleep for study volume",
     ],
-    needle: "UCAT percentile trajectory and interview readiness. These are the controllable variables.",
+    needle:
+      "UCAT percentile trajectory and interview readiness. These are the controllable variables.",
   },
   gap: {
     label: "Gap Year",
@@ -411,7 +415,10 @@ const roadmapData: Record<RoadmapStageKey, StageData> = {
     actions: [
       { label: "Re-Application Strategy", href: "/explore/medical-schools" },
       { label: "Model Score Improvements", href: "/explore/statistics" },
-      { label: "Strengthen Portfolio", href: "/resources/opportunities" },
+      {
+        label: "Strengthen Portfolio",
+        href: "/resources/opportunities",
+      },
     ],
     priorities: [
       "Identify your weakest variable honestly: ATAR, UCAT, or interview?",
@@ -470,7 +477,8 @@ const roadmapData: Record<RoadmapStageKey, StageData> = {
       "Passively drifting through the gap year without a structured plan",
       "Underestimating interstate options",
     ],
-    needle: "Diagnosing the actual bottleneck. Everything else depends on this.",
+    needle:
+      "Diagnosing the actual bottleneck. Everything else depends on this.",
   },
   grad: {
     label: "Graduate Applicant",
@@ -479,11 +487,21 @@ const roadmapData: Record<RoadmapStageKey, StageData> = {
     dot: "bg-violet-400",
     panelTone: "border-violet-300 bg-violet-50",
     focus: "Strategic Positioning",
-    objective: "Maximise GPA, GAMSAT, and portfolio positioning for the right schools.",
+    objective:
+      "Maximise GPA, GAMSAT, and portfolio positioning for the right schools.",
     actions: [
-      { label: "Compare Entry Requirements", href: "/explore/choose-your-uni" },
-      { label: "Understand Selection Models", href: "/explore/pathway" },
-      { label: "Interview Preparation", href: "/explore/pathway" },
+      {
+        label: "Compare Entry Requirements",
+        href: "/explore/choose-your-uni",
+      },
+      {
+        label: "Understand Selection Models",
+        href: "/explore/pathway",
+      },
+      {
+        label: "Interview Preparation",
+        href: "/explore/pathway",
+      },
     ],
     priorities: [
       "Understand weighted vs unweighted GPA. Final year subjects matter heavily.",
@@ -553,7 +571,8 @@ const roadmapData: Record<RoadmapStageKey, StageData> = {
       "Not understanding how GPA is calculated at specific schools",
       "Treating graduate entry as a consolation pathway rather than a distinct strategic choice",
     ],
-    needle: "School selection aligned to your strength profile. GPA and GAMSAT both matter, but which one matters more depends on where you apply.",
+    needle:
+      "School selection aligned to your strength profile. GPA and GAMSAT both matter, but which one matters more depends on where you apply.",
   },
 };
 
@@ -561,45 +580,76 @@ function cx(...classes: string[]) {
   return classes.filter(Boolean).join(" ");
 }
 
-function SoftCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+function SoftCard({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className={cx("rounded-[26px] border border-slate-200 bg-white/88 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur", className)}>
+    <div
+      className={cx(
+        "rounded-3xl border border-slate-200 bg-white/90 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur",
+        className
+      )}
+    >
       {children}
     </div>
   );
 }
 
-function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
+function SectionHeader({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) {
   return (
-    <div className="mb-4">
-      <h2 className="text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">{title}</h2>
-      <p className="mt-1 text-sm text-slate-500 sm:text-base">{subtitle}</p>
+    <div className="mb-5 sm:mb-6">
+      <h2 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
+        {title}
+      </h2>
+      <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
+        {subtitle}
+      </p>
     </div>
   );
 }
 
 function HomeCard({ item }: { item: CardItem }) {
   const Icon = item.icon;
+
   return (
     <Link href={item.href} className="group block h-full">
-      <SoftCard className="h-full min-h-51.25 flex flex-col justify-between p-5 transition duration-200 hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_18px_40px_rgba(15,23,42,0.10)]">
-        <div className={cx("mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br text-white shadow-sm", item.color)}>
-          <Icon className="h-6 w-6" />
-        </div>
-
-        <h3 className="text-[1.7rem] font-black leading-[1.05] tracking-tight text-slate-950">
-          {item.title}
-        </h3>
-
-        {item.badge ? (
-          <div className="mt-2">
-            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
-              {item.badge}
-            </span>
+      <SoftCard className="flex h-full min-h-64 flex-col justify-between p-4 transition duration-200 hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_18px_40px_rgba(15,23,42,0.10)] sm:p-5">
+        <div>
+          <div
+            className={cx(
+              "mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br text-white shadow-sm sm:h-14 sm:w-14",
+              item.color
+            )}
+          >
+            <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
-        ) : null}
 
-        <p className="mt-3 text-sm leading-6 text-slate-500">{item.description}</p>
+          <h3 className="text-2xl font-black leading-tight tracking-tight text-slate-950 sm:text-[1.7rem]">
+            {item.title}
+          </h3>
+
+          {item.badge ? (
+            <div className="mt-2">
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
+                {item.badge}
+              </span>
+            </div>
+          ) : null}
+
+          <p className="mt-3 text-sm leading-6 text-slate-500">
+            {item.description}
+          </p>
+        </div>
 
         <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900 transition group-hover:text-emerald-700">
           Open
@@ -612,32 +662,43 @@ function HomeCard({ item }: { item: CardItem }) {
 
 function WelcomeHero() {
   return (
-    <section className="mb-10">
-      <div className="overflow-hidden rounded-4xl bg-linear-to-br from-emerald-800 via-emerald-700 to-emerald-600 px-6 py-10 text-white shadow-[0_25px_70px_rgba(16,185,129,0.35)] sm:px-10 sm:py-14">
-        <div className="mx-auto max-w-4xl text-center">
-          <span className="inline-flex items-center rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-emerald-50 backdrop-blur">
+    <section className="mb-8 sm:mb-10">
+      <div className="overflow-hidden rounded-3xl bg-linear-to-br from-emerald-800 via-emerald-700 to-emerald-600 px-5 py-8 text-white shadow-[0_25px_70px_rgba(16,185,129,0.35)] sm:px-8 sm:py-12 lg:px-10 lg:py-14">
+        <div className="mx-auto max-w-5xl text-center">
+          <span className="inline-flex items-center rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-emerald-50 backdrop-blur sm:px-4 sm:py-2 sm:text-sm">
             <Sparkles className="mr-2 h-4 w-4" />
             Medicine Entry Resource Hub
           </span>
-          <h1 className="mt-6 text-5xl font-black leading-[0.95] tracking-tight text-white sm:text-7xl">
+
+          <h1 className="mt-5 text-4xl font-black leading-[0.95] tracking-tight text-white sm:text-6xl lg:text-7xl">
             Welcome to the
             <br />
             Aussie Med Guide
           </h1>
-          <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-emerald-50/95 sm:text-xl">
-            Your comprehensive tool for navigating Australian medical school admissions. From ATAR and UCAT requirements to scholarships and accommodation. Built by a med student for aspiring doctors.
+
+          <p className="mx-auto mt-5 max-w-3xl text-sm leading-7 text-emerald-50/95 sm:text-base sm:leading-8 lg:text-xl">
+            Your comprehensive tool for navigating Australian medical school
+            admissions. From ATAR and UCAT requirements to scholarships and
+            accommodation. Built by a med student for aspiring doctors.
           </p>
 
-          <div className="mt-10 grid gap-4 sm:grid-cols-3">
+          <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             {[
               { icon: GraduationCap, value: "21", label: "Med Schools" },
               { icon: Map, value: "8", label: "States & Territories" },
               { icon: BookOpen, value: "3", label: "Entry Pathways" },
             ].map((stat) => (
-              <div key={stat.label} className="rounded-3xl bg-white/10 p-6 backdrop-blur-sm ring-1 ring-white/10">
-                <stat.icon className="mx-auto h-7 w-7 text-white" />
-                <div className="mt-4 text-5xl font-black tracking-tight text-white">{stat.value}</div>
-                <div className="mt-1 text-sm text-emerald-50/90">{stat.label}</div>
+              <div
+                key={stat.label}
+                className="rounded-3xl bg-white/10 p-5 backdrop-blur-sm ring-1 ring-white/10 sm:p-6"
+              >
+                <stat.icon className="mx-auto h-6 w-6 text-white sm:h-7 sm:w-7" />
+                <div className="mt-3 text-4xl font-black tracking-tight text-white sm:mt-4 sm:text-5xl">
+                  {stat.value}
+                </div>
+                <div className="mt-1 text-sm text-emerald-50/90">
+                  {stat.label}
+                </div>
               </div>
             ))}
           </div>
@@ -656,21 +717,31 @@ function RoadmapPanel({ stage }: { stage: StageData }) {
       transition={{ duration: 0.22 }}
       className="space-y-4"
     >
-      <div className={cx("rounded-3xl border p-5", stage.panelTone)}>
+      <div className={cx("rounded-3xl border p-4 sm:p-5", stage.panelTone)}>
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <span className={cx("inline-flex items-center rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] shadow-sm", stage.chip)}>
+          <div className="min-w-0">
+            <span
+              className={cx(
+                "inline-flex items-center rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] shadow-sm",
+                stage.chip
+              )}
+            >
               {stage.shortLabel}
             </span>
-            <h3 className="mt-3 text-3xl font-black tracking-tight text-slate-950">Focus: {stage.focus}</h3>
-            <p className="mt-1 text-sm text-slate-600">Objective: {stage.objective}</p>
+            <h3 className="mt-3 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+              Focus: {stage.focus}
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              Objective: {stage.objective}
+            </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {stage.actions.map((action) => (
               <Link
                 key={action.label}
                 href={action.href}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
               >
                 {action.label}
                 <ArrowRight className="h-4 w-4" />
@@ -680,8 +751,10 @@ function RoadmapPanel({ stage }: { stage: StageData }) {
         </div>
 
         <div className="mt-5 border-t border-slate-200/80 pt-4">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Top 3 Priorities</p>
-          <ol className="mt-3 space-y-2 pl-5 text-sm leading-7 text-slate-700 list-decimal">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+            Top 3 Priorities
+          </p>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-7 text-slate-700">
             {stage.priorities.map((priority) => (
               <li key={priority}>{priority}</li>
             ))}
@@ -689,19 +762,30 @@ function RoadmapPanel({ stage }: { stage: StageData }) {
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {stage.sections.map((section) => (
-          <div key={section.title} className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-3 flex items-start justify-between gap-4">
-              <h4 className="text-2xl font-black tracking-tight text-slate-950">{section.title}</h4>
-              <span className={cx("rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em]", section.tone)}>
+          <div
+            key={section.title}
+            className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+          >
+            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <h4 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
+                {section.title}
+              </h4>
+              <span
+                className={cx(
+                  "w-fit rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em]",
+                  section.tone
+                )}
+              >
                 {section.badge}
               </span>
             </div>
+
             <ul className="space-y-2 text-sm leading-7 text-slate-700">
               {section.items.map((item) => (
                 <li key={item} className="flex gap-2">
-                  <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
                   <span>{item}</span>
                 </li>
               ))}
@@ -710,70 +794,114 @@ function RoadmapPanel({ stage }: { stage: StageData }) {
         ))}
       </div>
 
-      <div className="rounded-[22px] border border-amber-300 bg-amber-50 p-5">
-        <h4 className="inline-flex items-center gap-2 text-xl font-black tracking-tight text-amber-950">
+      <div className="rounded-3xl border border-amber-300 bg-amber-50 p-4 sm:p-5">
+        <h4 className="inline-flex items-center gap-2 text-lg font-black tracking-tight text-amber-950 sm:text-xl">
           <ShieldCheck className="h-5 w-5" />
           Common Mistakes at This Stage
         </h4>
         <ul className="mt-3 space-y-2 text-sm leading-7 text-amber-900">
           {stage.mistakes.map((mistake) => (
             <li key={mistake} className="flex gap-2">
-              <span className="mt-2 h-1.5 w-1.5 rounded-full bg-amber-600" />
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-600" />
               <span>{mistake}</span>
             </li>
           ))}
         </ul>
       </div>
 
-      <div className="rounded-[22px] border border-emerald-300 bg-emerald-50 p-5">
-        <h4 className="inline-flex items-center gap-2 text-xl font-black tracking-tight text-emerald-950">
+      <div className="rounded-3xl border border-emerald-300 bg-emerald-50 p-4 sm:p-5">
+        <h4 className="inline-flex items-center gap-2 text-lg font-black tracking-tight text-emerald-950 sm:text-xl">
           <Target className="h-5 w-5" />
           What Moves the Needle Most
         </h4>
-        <p className="mt-2 text-sm leading-7 text-emerald-900">{stage.needle}</p>
+        <p className="mt-2 text-sm leading-7 text-emerald-900">
+          {stage.needle}
+        </p>
       </div>
     </motion.div>
   );
 }
 
 function RoadmapSectionHome() {
-  const [activeStage, setActiveStage] = useState<RoadmapStageKey | null>("year10_11");
+  const [activeStage, setActiveStage] =
+    useState<RoadmapStageKey>("year10_11");
   const [expanded, setExpanded] = useState(false);
-  const currentStage = useMemo(() => (activeStage ? roadmapData[activeStage] : null), [activeStage]);
 
-  const stageButtons: { key: RoadmapStageKey; label: string; dot: string; activeTone: string }[] = [
-    { key: "year10_11", label: "Year 10 or 11", dot: "bg-emerald-400", activeTone: "from-emerald-500 to-teal-500 text-white border-emerald-400" },
-    { key: "year12", label: "Year 12", dot: "bg-rose-400", activeTone: "from-rose-500 to-orange-500 text-white border-rose-400" },
-    { key: "gap", label: "Gap Year", dot: "bg-blue-400", activeTone: "from-blue-500 to-indigo-500 text-white border-blue-400" },
-    { key: "grad", label: "Graduate Applicant", dot: "bg-violet-400", activeTone: "from-violet-500 to-purple-500 text-white border-violet-400" },
+  const currentStage = useMemo(
+    () => roadmapData[activeStage],
+    [activeStage]
+  );
+
+  const stageButtons: {
+    key: RoadmapStageKey;
+    label: string;
+    dot: string;
+    activeTone: string;
+  }[] = [
+    {
+      key: "year10_11",
+      label: "Year 10 or 11",
+      dot: "bg-emerald-400",
+      activeTone:
+        "from-emerald-500 to-teal-500 text-white border-emerald-400",
+    },
+    {
+      key: "year12",
+      label: "Year 12",
+      dot: "bg-rose-400",
+      activeTone:
+        "from-rose-500 to-orange-500 text-white border-rose-400",
+    },
+    {
+      key: "gap",
+      label: "Gap Year",
+      dot: "bg-blue-400",
+      activeTone:
+        "from-blue-500 to-indigo-500 text-white border-blue-400",
+    },
+    {
+      key: "grad",
+      label: "Graduate Applicant",
+      dot: "bg-violet-400",
+      activeTone:
+        "from-violet-500 to-purple-500 text-white border-violet-400",
+    },
   ];
 
   return (
-    <section className="mb-10">
-      <SoftCard className="overflow-hidden border-emerald-200 bg-linear-to-b from-emerald-50/65 to-white p-5 sm:p-6">
+    <section className="mb-10 sm:mb-12">
+      <SoftCard className="overflow-hidden border-emerald-200 bg-linear-to-b from-emerald-50/65 to-white p-4 sm:p-6">
         <button
-          onClick={() => setExpanded((v) => !v)}
-          className="flex w-full items-start justify-between gap-4 text-left"
+          onClick={() => setExpanded((value) => !value)}
+          className="flex w-full items-start justify-between gap-3 text-left sm:gap-4"
         >
           <div className="mx-auto max-w-4xl flex-1 text-center">
-            <span className="inline-flex items-center rounded-full bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-700">
+            <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700 sm:px-4 sm:py-2 sm:text-sm">
               Your Roadmap
             </span>
-            <h2 className="mt-4 text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">
+            <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
               Where are you in your journey?
             </h2>
             <p className="mx-auto mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-              Select your current stage to see a structured roadmap, priorities, and what actually moves the needle.
+              Select your current stage to see a structured roadmap, priorities,
+              and what actually moves the needle.
             </p>
           </div>
+
           <div className="rounded-full border border-slate-200 bg-white p-2 shadow-sm">
-            <ChevronDown className={cx("h-5 w-5 text-slate-500 transition", expanded ? "rotate-180" : "rotate-0")} />
+            <ChevronDown
+              className={cx(
+                "h-5 w-5 text-slate-500 transition",
+                expanded ? "rotate-180" : "rotate-0"
+              )}
+            />
           </div>
         </button>
 
-        <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           {stageButtons.map((stage) => {
             const isActive = activeStage === stage.key;
+
             return (
               <button
                 key={stage.key}
@@ -782,15 +910,22 @@ function RoadmapSectionHome() {
                   setExpanded(true);
                 }}
                 className={cx(
-                  "rounded-[20px] border px-5 py-5 text-left shadow-sm transition duration-200",
+                  "rounded-2xl border px-4 py-4 text-left shadow-sm transition duration-200 sm:px-5 sm:py-5",
                   isActive
                     ? `bg-linear-to-br ${stage.activeTone}`
                     : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50/40"
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <span className={cx("h-4 w-4 rounded-full shadow-sm", stage.dot)} />
-                  <span className="text-xl font-black tracking-tight">{stage.label}</span>
+                  <span
+                    className={cx(
+                      "h-3.5 w-3.5 shrink-0 rounded-full shadow-sm sm:h-4 sm:w-4",
+                      stage.dot
+                    )}
+                  />
+                  <span className="text-lg font-black tracking-tight sm:text-xl">
+                    {stage.label}
+                  </span>
                 </div>
               </button>
             );
@@ -798,7 +933,7 @@ function RoadmapSectionHome() {
         </div>
 
         <AnimatePresence initial={false}>
-          {expanded && currentStage ? (
+          {expanded ? (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
@@ -817,52 +952,68 @@ function RoadmapSectionHome() {
   );
 }
 
+function CardSection({
+  title,
+  subtitle,
+  items,
+}: {
+  title: string;
+  subtitle: string;
+  items: CardItem[];
+}) {
+  const isCompact = items.length <= 2;
+
+  return (
+    <section className="mb-12 sm:mb-14">
+      <SectionHeader title={title} subtitle={subtitle} />
+      <div
+        className={cx(
+          "grid grid-cols-1 gap-4 auto-rows-fr md:grid-cols-2",
+          isCompact ? "xl:grid-cols-2" : "xl:grid-cols-4"
+        )}
+      >
+        {items.map((item) => (
+          <HomeCard key={item.title} item={item} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.10),transparent_24%),radial-gradient(circle_at_right,rgba(139,92,246,0.08),transparent_28%),linear-gradient(180deg,#f8fafc_0%,#f6f7fb_42%,#f8fafc_100%)] text-slate-900">
-      <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
         <WelcomeHero />
         <RoadmapSectionHome />
 
-        <section className="mb-12">
-          <SectionHeader title="Blueprint" subtitle="Structured guides for parents and international students" />
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 auto-rows-fr">
-            {blueprintCards.map((item) => (
-              <HomeCard key={item.title} item={item} />
-            ))}
-          </div>
-        </section>
+        <CardSection
+          title="Blueprint"
+          subtitle="Structured guides for parents and international students"
+          items={blueprintCards}
+        />
 
-        <section className="mb-12">
-          <SectionHeader title="Explore" subtitle="Understand the landscape" />
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 auto-rows-fr">
-            {exploreCards.map((item) => (
-              <HomeCard key={item.title} item={item} />
-            ))}
-          </div>
-        </section>
+        <CardSection
+          title="Explore"
+          subtitle="Understand the landscape"
+          items={exploreCards}
+        />
 
-        <section className="mb-12">
-          <SectionHeader title="Resources" subtitle="Funding and support" />
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 auto-rows-fr">
-            {resourceCards.map((item) => (
-              <HomeCard key={item.title} item={item} />
-            ))}
-          </div>
-        </section>
+        <CardSection
+          title="Resources"
+          subtitle="Funding and support"
+          items={resourceCards}
+        />
 
-        <section className="mb-12">
-          <SectionHeader title="Tools" subtitle="Your premium application toolkit" />
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 auto-rows-fr">
-            {toolCards.map((item) => (
-              <HomeCard key={item.title} item={item} />
-            ))}
-          </div>
-        </section>
+        <CardSection
+          title="Tools"
+          subtitle="Your premium application toolkit"
+          items={toolCards}
+        />
 
         <section>
           <SectionHeader title="Info" subtitle="Learn more" />
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 auto-rows-fr">
+          <div className="grid grid-cols-1 gap-4 auto-rows-fr md:grid-cols-2 xl:grid-cols-2">
             {infoCards.map((item) => (
               <HomeCard key={item.title} item={item} />
             ))}

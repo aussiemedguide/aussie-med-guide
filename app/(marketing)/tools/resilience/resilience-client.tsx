@@ -338,7 +338,7 @@ export default function ResilienceClient({
       locked={!isPremium}
       title="Upgrade to unlock Resilience"
       description="Explore the full burnout and resilience toolkit, including the self-reflection tool, support systems, parent lens, and recovery planning."
-      ctaHref="/upgrade"
+      ctaHref="/info/pricing"
       ctaLabel="Upgrade to Pro"
       previewLabel="Resilience"
     >
