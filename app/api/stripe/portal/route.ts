@@ -15,7 +15,7 @@ const supabase = createClient(
 function getBaseUrl(req: Request) {
   const origin = req.headers.get("origin");
   if (origin) return origin;
-  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return process.env.NEXT_PUBLIC_APP_URL || "https://www.aussiemedguide.com";
 }
 
 export async function POST(req: Request) {

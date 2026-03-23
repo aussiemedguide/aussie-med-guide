@@ -13,6 +13,16 @@ const supabase = createClient(
 
 type AppPlan = "free" | "pro_monthly" | "pro_annual";
 
+type AppStatus =
+  | "free"
+  | "trialing"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "unpaid"
+  | "incomplete"
+  | "incomplete_expired";
+
 function getPlanFromPriceId(priceId?: string | null): AppPlan {
   if (!priceId) return "free";
   if (priceId === process.env.STRIPE_PRO_MONTHLY) return "pro_monthly";
@@ -43,15 +53,7 @@ async function upsertSubscriptionRecord(params: {
   stripeSubscriptionId?: string | null;
   stripePriceId?: string | null;
   plan: AppPlan;
-  status:
-    | "free"
-    | "trialing"
-    | "active"
-    | "past_due"
-    | "canceled"
-    | "unpaid"
-    | "incomplete"
-    | "incomplete_expired";
+  status: AppStatus;
   cancelAtPeriodEnd?: boolean;
   currentPeriodEnd?: string | null;
 }) {
@@ -110,15 +112,15 @@ export async function POST(req: Request) {
   try {
     const body = await req.text();
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    } catch (error) {
-    console.error("Webhook handler error:", error);
-
-    const message =
-      error instanceof Error ? error.message : "Webhook handler failed";
+  } catch (error) {
+    console.error("Webhook signature verification failed:", error);
 
     return NextResponse.json(
-      { error: message },
-      { status: 500 }
+      {
+        error:
+          error instanceof Error ? error.message : "Invalid webhook signature",
+      },
+      { status: 400 }
     );
   }
 
@@ -132,7 +134,7 @@ export async function POST(req: Request) {
           typeof session.customer === "string" ? session.customer : null;
         const stripeSubscriptionId =
           typeof session.subscription === "string" ? session.subscription : null;
-        const plan = (session.metadata?.plan as AppPlan | undefined) ?? "free";
+        const metadataPlan = (session.metadata?.plan as AppPlan | undefined) ?? "free";
 
         if (!clerkUserId) {
           console.warn("Missing clerk_user_id in checkout session metadata");
@@ -142,15 +144,7 @@ export async function POST(req: Request) {
         let stripePriceId: string | null = null;
         let currentPeriodEnd: string | null = null;
         let cancelAtPeriodEnd = false;
-        let status:
-          | "free"
-          | "trialing"
-          | "active"
-          | "past_due"
-          | "canceled"
-          | "unpaid"
-          | "incomplete"
-          | "incomplete_expired" = "active";
+        let status: AppStatus = "active";
 
         if (stripeSubscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(
@@ -158,7 +152,7 @@ export async function POST(req: Request) {
           );
 
           stripePriceId = subscription.items.data[0]?.price?.id ?? null;
-          status = subscription.status as typeof status;
+          status = subscription.status as AppStatus;
           cancelAtPeriodEnd = subscription.cancel_at_period_end ?? false;
 
           const periodEnd = (subscription as Stripe.Subscription & {
@@ -175,7 +169,7 @@ export async function POST(req: Request) {
           stripeCustomerId,
           stripeSubscriptionId,
           stripePriceId,
-          plan: stripePriceId ? getPlanFromPriceId(stripePriceId) : plan,
+          plan: stripePriceId ? getPlanFromPriceId(stripePriceId) : metadataPlan,
           status,
           cancelAtPeriodEnd,
           currentPeriodEnd,
@@ -219,15 +213,7 @@ export async function POST(req: Request) {
           stripeSubscriptionId: subscription.id,
           stripePriceId,
           plan,
-          status: subscription.status as
-            | "free"
-            | "trialing"
-            | "active"
-            | "past_due"
-            | "canceled"
-            | "unpaid"
-            | "incomplete"
-            | "incomplete_expired",
+          status: subscription.status as AppStatus,
           cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
           currentPeriodEnd,
         });
@@ -273,8 +259,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("Webhook handler error:", error);
+
     return NextResponse.json(
-      { error: "Webhook handler failed" },
+      {
+        error: error instanceof Error ? error.message : "Webhook handler failed",
+      },
       { status: 500 }
     );
   }

@@ -41,7 +41,14 @@ export async function POST(req: Request) {
     }
 
     const user = await currentUser();
-    const email = user?.primaryEmailAddress?.emailAddress ?? undefined;
+    const email = user?.primaryEmailAddress?.emailAddress ?? null;
+
+    if (!email) {
+      return NextResponse.json(
+        { error: "No primary email found for this account." },
+        { status: 400 }
+      );
+    }
 
     const priceId =
       plan === "pro_monthly"
@@ -70,26 +77,21 @@ export async function POST(req: Request) {
       );
     }
 
-    let subscription = existingSubscription;
+    if (!existingSubscription) {
+      const { error: createSubscriptionError } = await supabase
+        .from("subscriptions")
+        .insert({
+          clerk_user_id: userId,
+          plan: "free",
+          status: "free",
+          stripe_customer_id: null,
+          stripe_subscription_id: null,
+          stripe_price_id: null,
+          cancel_at_period_end: false,
+          current_period_end: null,
+        });
 
-    if (!subscription) {
-      const { data: createdSubscription, error: createSubscriptionError } =
-        await supabase
-          .from("subscriptions")
-          .insert({
-            clerk_user_id: userId,
-            plan: "free",
-            status: "free",
-            stripe_customer_id: null,
-            stripe_subscription_id: null,
-            stripe_price_id: null,
-            cancel_at_period_end: false,
-            current_period_end: null,
-          })
-          .select("*")
-          .single();
-
-      if (createSubscriptionError || !createdSubscription) {
+      if (createSubscriptionError) {
         console.error(
           "Failed to create subscription record:",
           createSubscriptionError
@@ -99,13 +101,12 @@ export async function POST(req: Request) {
           { status: 500 }
         );
       }
-
-      subscription = createdSubscription;
     }
 
     const alreadyOnRequestedPlan =
-      subscription?.plan === plan &&
-      (subscription?.status === "active" || subscription?.status === "trialing");
+      existingSubscription?.plan === plan &&
+      (existingSubscription?.status === "active" ||
+        existingSubscription?.status === "trialing");
 
     if (alreadyOnRequestedPlan) {
       return NextResponse.json(
@@ -114,67 +115,11 @@ export async function POST(req: Request) {
       );
     }
 
-    let stripeCustomerId: string | null =
-      subscription?.stripe_customer_id ?? null;
-
-    if (stripeCustomerId) {
-      try {
-        const existingCustomer = await stripe.customers.retrieve(stripeCustomerId);
-
-        if ("deleted" in existingCustomer && existingCustomer.deleted) {
-          stripeCustomerId = null;
-        } else {
-          await stripe.customers.update(stripeCustomerId, {
-            email,
-            metadata: {
-              clerk_user_id: userId,
-            },
-          });
-        }
-      } catch {
-        stripeCustomerId = null;
-      }
-    }
-
-    if (!stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        email,
-        metadata: {
-          clerk_user_id: userId,
-        },
-      });
-
-      stripeCustomerId = customer.id;
-
-      const { data: updatedSubscription, error: updateSubscriptionError } =
-        await supabase
-          .from("subscriptions")
-          .update({
-            stripe_customer_id: stripeCustomerId,
-          })
-          .eq("clerk_user_id", userId)
-          .select("*")
-          .single();
-
-      if (updateSubscriptionError || !updatedSubscription) {
-        console.error(
-          "Failed to save Stripe customer ID:",
-          updateSubscriptionError
-        );
-        return NextResponse.json(
-          { error: "Failed to save customer record." },
-          { status: 500 }
-        );
-      }
-
-      subscription = updatedSubscription;
-    }
-
     const baseUrl = getBaseUrl(req);
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
-      customer: stripeCustomerId,
+      customer_email: email,
       client_reference_id: userId,
       line_items: [
         {
