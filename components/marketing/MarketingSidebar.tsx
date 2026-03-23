@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import {
   Home,
   Crown,
@@ -28,11 +27,7 @@ import {
 } from "lucide-react";
 import type { ComponentType } from "react";
 import ActiveNavLink from "@/components/marketing/ActiveNavLink";
-
-const MobileSidebarShell = dynamic(
-  () => import("@/components/marketing/MobileSidebarShell"),
-  { ssr: false }
-);
+import MobileSidebarShell from "@/components/marketing/MobileSidebarShell";
 
 type NavLinkItem = {
   href: string;
