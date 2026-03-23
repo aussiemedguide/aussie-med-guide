@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { hasPremiumAccessFromSubscription } from "@/lib/access";
 
 export async function getUserAccess(clerkUserId: string) {
-  noStore();
+  noStore(); // disables caching
 
   const supabase = createAdminClient();
 
@@ -22,16 +22,8 @@ export async function getUserAccess(clerkUserId: string) {
     };
   }
 
-  const isPremium = hasPremiumAccessFromSubscription(subscription);
-
-  console.log("GET_USER_ACCESS", {
-    clerkUserId,
-    subscription,
-    isPremium,
-  });
-
   return {
     subscription,
-    isPremium,
+    isPremium: hasPremiumAccessFromSubscription(subscription),
   };
 }
