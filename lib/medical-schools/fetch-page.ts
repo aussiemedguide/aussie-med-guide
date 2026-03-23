@@ -1,4 +1,4 @@
-import type { FetchedPage } from "@/types/medical-schools";
+import type { FetchedPage } from "@/lib/medical-schools/types/medical-schools";
 
 export async function fetchPage(url: string): Promise<FetchedPage> {
   const res = await fetch(url, {

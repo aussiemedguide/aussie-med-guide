@@ -1,4 +1,4 @@
-import type { DetectedChange } from "@/types/medical-schools";
+import type { DetectedChange } from "@/lib/medical-schools/types/medical-schools";
 
 function clip(text: string, max = 600) {
   return text.length <= max ? text : `${text.slice(0, max)}...`;

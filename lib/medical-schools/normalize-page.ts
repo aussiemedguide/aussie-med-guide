@@ -1,4 +1,4 @@
-import type { NormalizedPage } from "@/types/medical-schools";
+import type { NormalizedPage } from "@/lib/medical-schools/types/medical-schools";
 
 function stripHtml(html: string) {
   return html
