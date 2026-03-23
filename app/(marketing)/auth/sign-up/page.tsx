@@ -1,11 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Chrome, Crown, Zap } from "lucide-react";
 
-type SearchParams = Promise<{
-  plan?: string;
-}>;
-
-function PlanBadge({ plan }: { plan: string }) {
+function PlanBadge({ plan }: { plan: "monthly" | "annual" }) {
   if (plan === "annual") {
     return (
       <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
@@ -23,13 +22,10 @@ function PlanBadge({ plan }: { plan: string }) {
   );
 }
 
-export default async function SignUpPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
-  const params = await searchParams;
-  const selectedPlan = params?.plan === "annual" ? "annual" : "monthly";
+export default function SignUpPage() {
+  const searchParams = useSearchParams();
+  const selectedPlan =
+    searchParams.get("plan") === "annual" ? "annual" : "monthly";
 
   return (
     <div className="bg-slate-50 px-6 py-12 lg:px-10">
