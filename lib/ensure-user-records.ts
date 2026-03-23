@@ -33,10 +33,27 @@ export async function ensureUserRecords({
     throw new Error(`Failed upserting profile record: ${profileError.message}`);
   }
 
-  const { error: subscriptionError } = await supabase
-    .from("subscriptions")
-    .upsert(
-      {
+  const { data: existingSubscription, error: existingSubscriptionError } =
+    await supabase
+      .from("subscriptions")
+      .select("clerk_user_id")
+      .eq("clerk_user_id", clerkUserId)
+      .maybeSingle();
+
+  if (existingSubscriptionError) {
+    console.error(
+      "Failed checking existing subscription record:",
+      existingSubscriptionError
+    );
+    throw new Error(
+      `Failed checking existing subscription record: ${existingSubscriptionError.message}`
+    );
+  }
+
+  if (!existingSubscription) {
+    const { error: subscriptionError } = await supabase
+      .from("subscriptions")
+      .insert({
         clerk_user_id: clerkUserId,
         plan: "free",
         status: "free",
@@ -45,17 +62,13 @@ export async function ensureUserRecords({
         stripe_price_id: null,
         cancel_at_period_end: false,
         current_period_end: null,
-      },
-      {
-        onConflict: "clerk_user_id",
-        ignoreDuplicates: false,
-      }
-    );
+      });
 
-  if (subscriptionError) {
-    console.error("Failed upserting subscription record:", subscriptionError);
-    throw new Error(
-      `Failed upserting subscription record: ${subscriptionError.message}`
-    );
+    if (subscriptionError) {
+      console.error("Failed inserting subscription record:", subscriptionError);
+      throw new Error(
+        `Failed inserting subscription record: ${subscriptionError.message}`
+      );
+    }
   }
 }
