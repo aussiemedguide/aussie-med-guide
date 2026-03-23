@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { ArrowRight, ChevronDown, ShieldCheck, Target } from "lucide-react";
 
 type RoadmapStageKey = "year10_11" | "year12" | "gap" | "grad";
@@ -358,7 +358,6 @@ function RoadmapPanel({ stage }: { stage: StageData }) {
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.22 }}
       className="space-y-4"
     >
@@ -574,21 +573,11 @@ export default function RoadmapSectionHome() {
           })}
         </div>
 
-        <AnimatePresence initial={false}>
-          {expanded ? (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.25 }}
-              className="overflow-hidden"
-            >
-              <div className="mt-6">
-                <RoadmapPanel stage={currentStage} />
-              </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+        {expanded && (
+          <div className="mt-6">
+            <RoadmapPanel stage={currentStage} />
+          </div>
+        )}
       </div>
     </section>
   );

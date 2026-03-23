@@ -1,38 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
-import {
-  Home,
-  Crown,
-  Globe,
-  Fingerprint,
-  Route,
-  GraduationCap,
-  FileText,
-  CalendarDays,
-  BarChart3,
-  Trophy,
-  Search,
-  Briefcase,
-  BadgeDollarSign,
-  Building2,
-  Calculator,
-  Target,
-  BookOpen,
-  Brain,
-  TrendingUp,
-  HeartPulse,
-  Activity,
-  CircleDollarSign,
-  UserRound,
-} from "lucide-react";
-import type { ComponentType } from "react";
-import ActiveNavLink from "@/components/marketing/ActiveNavLink";
+import ActiveNavLink, {
+  type NavIconKey,
+} from "@/components/marketing/ActiveNavLink";
 import MobileSidebarShell from "@/components/marketing/MobileSidebarShell";
 
 type NavLinkItem = {
   href: string;
   label: string;
-  icon: ComponentType<{ className?: string }>;
+  icon: NavIconKey;
 };
 
 type NavSection = {
@@ -47,16 +23,16 @@ function cx(...classes: string[]) {
 export const marketingSections: NavSection[] = [
   {
     title: "Main",
-    items: [{ href: "/", label: "Home", icon: Home }],
+    items: [{ href: "/", label: "Home", icon: "home" }],
   },
   {
     title: "Blueprint",
     items: [
-      { href: "/blueprint/parent", label: "Parent Blueprint", icon: Crown },
+      { href: "/blueprint/parent", label: "Parent Blueprint", icon: "crown" },
       {
         href: "/blueprint/international",
         label: "International Blueprint",
-        icon: Globe,
+        icon: "globe",
       },
     ],
   },
@@ -66,34 +42,34 @@ export const marketingSections: NavSection[] = [
       {
         href: "/explore/student-classification",
         label: "Student Classification",
-        icon: Fingerprint,
+        icon: "fingerprint",
       },
-      { href: "/explore/pathway", label: "Pathway", icon: Route },
+      { href: "/explore/pathway", label: "Pathway", icon: "route" },
       {
         href: "/explore/medical-schools",
         label: "Medical Schools",
-        icon: GraduationCap,
+        icon: "graduation-cap",
       },
       {
         href: "/explore/application-systems",
         label: "Application Systems",
-        icon: FileText,
+        icon: "file-text",
       },
       {
         href: "/explore/offers-selection",
         label: "Offers & Selection",
-        icon: CalendarDays,
+        icon: "calendar-days",
       },
       {
         href: "/explore/statistics",
         label: "Statistics",
-        icon: BarChart3,
+        icon: "bar-chart-3",
       },
-      { href: "/explore/rankings", label: "Rankings", icon: Trophy },
+      { href: "/explore/rankings", label: "Rankings", icon: "trophy" },
       {
         href: "/explore/choose-your-uni",
         label: "Choose Your Uni",
-        icon: Search,
+        icon: "search",
       },
     ],
   },
@@ -103,19 +79,19 @@ export const marketingSections: NavSection[] = [
       {
         href: "/resources/opportunities",
         label: "Opportunities",
-        icon: Briefcase,
+        icon: "briefcase",
       },
       {
         href: "/resources/scholarships",
         label: "Scholarships",
-        icon: BadgeDollarSign,
+        icon: "badge-dollar-sign",
       },
       {
         href: "/resources/accommodation",
         label: "Accommodation",
-        icon: Building2,
+        icon: "building-2",
       },
-      { href: "/resources/budget", label: "Budget", icon: Calculator },
+      { href: "/resources/budget", label: "Budget", icon: "calculator" },
     ],
   },
   {
@@ -124,25 +100,25 @@ export const marketingSections: NavSection[] = [
       {
         href: "/tools/strategy-hub",
         label: "Strategy Hub",
-        icon: Target,
+        icon: "target",
       },
       {
         href: "/tools/study-engine",
         label: "Study Engine",
-        icon: BookOpen,
+        icon: "book-open",
       },
-      { href: "/tools/train", label: "Train", icon: Brain },
+      { href: "/tools/train", label: "Train", icon: "brain" },
       {
         href: "/tools/optimise",
         label: "Optimise",
-        icon: TrendingUp,
+        icon: "trending-up",
       },
       {
         href: "/tools/resilience",
         label: "Resilience",
-        icon: HeartPulse,
+        icon: "heart-pulse",
       },
-      { href: "/tools/command", label: "Command", icon: Activity },
+      { href: "/tools/command", label: "Command", icon: "activity" },
     ],
   },
   {
@@ -151,9 +127,9 @@ export const marketingSections: NavSection[] = [
       {
         href: "/info/pricing",
         label: "Pricing",
-        icon: CircleDollarSign,
+        icon: "circle-dollar-sign",
       },
-      { href: "/info/about", label: "About", icon: UserRound },
+      { href: "/info/about", label: "About", icon: "user-round" },
     ],
   },
 ];
@@ -167,14 +143,16 @@ function SidebarSections() {
             {section.title}
           </p>
           <div className="space-y-1">
-            {section.items.map((item) => (
-              <ActiveNavLink
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                icon={item.icon}
-              />
-            ))}
+            {section.items
+              .filter((item) => item.href && item.label && item.icon)
+              .map((item) => (
+                <ActiveNavLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                />
+              ))}
           </div>
         </div>
       ))}

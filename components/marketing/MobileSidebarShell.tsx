@@ -3,14 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { ComponentType } from "react";
 import { Menu, X } from "lucide-react";
-import ActiveNavLink from "@/components/marketing/ActiveNavLink";
+import ActiveNavLink, {
+  type NavIconKey,
+} from "@/components/marketing/ActiveNavLink";
 
 type NavLinkItem = {
   href: string;
   label: string;
-  icon: ComponentType<{ className?: string }>;
+  icon: NavIconKey;
 };
 
 type NavSection = {
@@ -37,15 +38,17 @@ function SidebarSections({
             {section.title}
           </p>
           <div className="space-y-1">
-            {section.items.map((item) => (
-              <ActiveNavLink
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                icon={item.icon}
-                onClick={onItemClick}
-              />
-            ))}
+            {section.items
+              .filter((item) => item.href && item.label && item.icon)
+              .map((item) => (
+                <ActiveNavLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  onClick={onItemClick}
+                />
+              ))}
           </div>
         </div>
       ))}
