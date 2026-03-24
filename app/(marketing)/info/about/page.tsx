@@ -156,7 +156,7 @@ export default function AboutFounderPage() {
           <div className="grid gap-6 lg:grid-cols-[0.86fr_1.14fr]">
             <div className="overflow-hidden rounded-3xl bg-slate-200">
               <Image
-                src="/images/founder/manu-founder.JPG"
+                src="/images/founder/manu-founder.webp"
                 alt="Manu Masabattula speaking"
                 width={700}
                 height={900}
