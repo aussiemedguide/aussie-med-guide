@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import TrainVoicePanel from "@/components/train/TrainVoicePanel";
+import { useScribe } from "@elevenlabs/react";
+import PulseOrb from "@/components/train/PulseOrb";
 import { createClient } from "@/lib/supabase/client";
 import {
   ArrowRight,
@@ -878,6 +879,141 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
   const pulseVoiceIdPanel =
   process.env.NEXT_PUBLIC_PULSE_VOICE_ID_PANEL || "JBFqnCBsd6RMkjVDRZzb";
 
+  const [pulseMode, setPulseMode] = useState<"idle" | "speaking" | "listening" | "processing">("idle");
+  const [voiceModeEnabled, setVoiceModeEnabled] = useState(true);
+  const [autoPlayQuestion, setAutoPlayQuestion] = useState(true);
+  
+  const currentVoiceId =
+  interviewMode === "MMI" ? pulseVoiceIdMmi : pulseVoiceIdPanel;
+  
+  const currentVoiceProfile = interviewMode === "MMI" ? "mmi" : "panel";
+  
+  const currentQuestionText =
+  interviewMode === "MMI"
+    ? currentPrompt?.questions[currentQuestionIndex] || ""
+    : currentPanelPrompt?.prompt || "";
+    
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+const committedTranscriptRef = useRef("");
+
+const scribe = useScribe({
+  modelId: "scribe_v2_realtime",
+  onPartialTranscript: (data) => {
+    setPulseMode("listening");
+
+    const partialText =
+      typeof data === "string"
+        ? data
+        : typeof data?.text === "string"
+          ? data.text
+          : "";
+
+    setCurrentResponse(
+      [committedTranscriptRef.current, partialText].filter(Boolean).join(" ").trim()
+    );
+  },
+  onCommittedTranscript: (data) => {
+    const committedText =
+      typeof data === "string"
+        ? data
+        : typeof data?.text === "string"
+          ? data.text
+          : "";
+
+    committedTranscriptRef.current = [
+      committedTranscriptRef.current,
+      committedText,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    setCurrentResponse(committedTranscriptRef.current);
+  },
+});
+
+async function speakCurrentQuestion() {
+  if (!voiceModeEnabled || !currentQuestionText || !currentVoiceId) return;
+
+  setPulseMode("speaking");
+
+  try {
+    const res = await fetch("/api/train/voice/question", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text: currentQuestionText,
+        voiceId: currentVoiceId,
+        profile: currentVoiceProfile,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to load question audio");
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+
+    const audio = new Audio(url);
+    audioRef.current = audio;
+
+    audio.onended = () => {
+      setPulseMode("idle");
+      URL.revokeObjectURL(url);
+    };
+
+    await audio.play();
+  } catch (error) {
+    console.error(error);
+    setPulseMode("idle");
+  }
+}
+
+async function startVoiceAnswer() {
+  try {
+    committedTranscriptRef.current = currentResponse.trim();
+    setPulseMode("listening");
+
+    const tokenRes = await fetch("/api/train/voice/scribe-token", {
+      method: "GET",
+    });
+
+    if (!tokenRes.ok) {
+      throw new Error("Failed to get scribe token");
+    }
+
+    const tokenPayload = (await tokenRes.json()) as { token: string };
+
+    await scribe.connect({
+      token: tokenPayload.token,
+      microphone: {
+        echoCancellation: true,
+        noiseSuppression: true,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    setPulseMode("idle");
+  }
+}
+
+function stopVoiceAnswer() {
+  scribe.disconnect();
+  setPulseMode("idle");
+}
+
+function clearVoiceTranscript() {
+  committedTranscriptRef.current = "";
+  setCurrentResponse("");
+}
+
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(ucatStorageKey);
@@ -1064,10 +1200,6 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
 
   function removeUcatResult(id: string) {
     setUcatAttempts((prev) => prev.filter((item) => item.id !== id));
-  }
-
-  function handleVoiceTranscriptFinalized(text: string) {
-    setCurrentResponse(text);
   }
 
   function resetCurrentDraft() {
