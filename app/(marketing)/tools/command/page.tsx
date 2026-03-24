@@ -117,7 +117,7 @@ export default async function CommandPage() {
       supabase
         .from("command_events")
         .select("id, title, date, type, notes, source")
-        .eq("user_id", userId)
+        .eq("clerk_user_id", userId)
         .order("date", { ascending: true }),
       supabase
         .from("site_settings")

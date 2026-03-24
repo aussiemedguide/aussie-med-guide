@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     const { data, error } = await supabaseAdmin
       .from("experience_entries")
       .select("*")
-      .eq("user_id", userId)
+      .eq("clerk_user_id", userId)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     const { data, error } = await supabaseAdmin
       .from("experience_entries")
       .insert({
-        user_id: userId,
+        clerk_user_id: userId,
         title,
         organization: organization || null,
         category,
@@ -111,7 +111,7 @@ export async function DELETE(req: Request) {
       .from("experience_entries")
       .delete()
       .eq("id", id)
-      .eq("user_id", userId);
+      .eq("clerk_user_id", userId);
 
     if (error) {
       console.error("DELETE experience_entries error:", error);

@@ -913,7 +913,7 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
         .select(
           "id, created_at, mode, title, prompt, response, clarity, reasoning, empathy, structure, professionalism, overall, feedback, improvements"
         )
-        .eq("user_id", userId)
+        .eq("clerk_user_id", userId)
         .order("created_at", { ascending: false });
 
       if (cancelled) return;
@@ -1114,7 +1114,7 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
       }
 
       const insertPayload = {
-        user_id: userId,
+        clerk_user_id: userId,
         mode: interviewMode,
         title,
         prompt,
@@ -1212,7 +1212,7 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
       .from("interview_attempts")
       .delete()
       .eq("id", id)
-      .eq("user_id", userId);
+      .eq("clerk_user_id", userId);
 
     if (error && existing) {
       setPracticeHistory((prev) => [existing, ...prev]);

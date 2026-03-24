@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
     const { error } = await supabase.from("command_profiles").upsert(
       {
-        user_id: userId,
+        clerk_user_id: userId,
         display_name: name,
         year_level: yearLevel,
         state,
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
         updated_at: new Date().toISOString(),
       },
       {
-        onConflict: "user_id",
+        onConflict: "clerk_user_id",
       }
     );
 

@@ -725,7 +725,7 @@ export default function CommandClient({
     setEventMessage("");
 
     const payload = {
-      user_id: userId,
+      clerk_user_id: userId,
       title: draftDate.title,
       date: draftDate.date,
       type: draftDate.type,
@@ -776,7 +776,7 @@ export default function CommandClient({
       .from("command_events")
       .delete()
       .eq("id", id)
-      .eq("user_id", userId);
+      .eq("clerk_user_id", userId);
 
     if (error) {
       setCustomDates((current) => [...current, existing]);
