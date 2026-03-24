@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
+import TrainVoicePanel from "@/components/train/TrainVoicePanel";
 import { createClient } from "@/lib/supabase/client";
 import {
   ArrowRight,
@@ -13,8 +14,6 @@ import {
   GraduationCap,
   LineChart,
   Lock,
-  Mic,
-  Pause,
   Plus,
   Sparkles,
   Target,
@@ -527,7 +526,12 @@ function SoftBadge({
   };
 
   return (
-    <span className={cn("inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold", styles[tone])}>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold",
+        styles[tone]
+      )}
+    >
       {children}
     </span>
   );
@@ -796,7 +800,8 @@ function PremiumLockedTrainPreview() {
           </p>
 
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            The interview system saves evaluated attempts so users can track genuine improvement over time, not just practise once and lose everything.
+            The interview system saves evaluated attempts so users can track genuine improvement over
+            time, not just practise once and lose everything.
           </p>
 
           <a
@@ -814,7 +819,7 @@ function PremiumLockedTrainPreview() {
 
 export default function TrainClient({ isPremium, userId }: TrainClientProps) {
   const { getToken } = useAuth();
-const supabase = useMemo(() => createClient(getToken), [getToken]);
+  const supabase = useMemo(() => createClient(getToken), [getToken]);
 
   const [activeTab, setActiveTab] = useState<TrainTab>("readiness");
   const [interviewTab, setInterviewTab] = useState<InterviewTab>("practice");
@@ -856,7 +861,6 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
   const [latestFeedback, setLatestFeedback] = useState<PracticeAttempt | null>(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [isRunningTimer, setIsRunningTimer] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
 
   const [storyForm, setStoryForm] = useState({
@@ -868,7 +872,11 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
     tags: "",
   });
 
-  const recognitionRef = useRef<any>(null);
+  const pulseVoiceIdMmi =
+  process.env.NEXT_PUBLIC_PULSE_VOICE_ID_MMI || "JBFqnCBsd6RMkjVDRZzb";
+
+  const pulseVoiceIdPanel =
+  process.env.NEXT_PUBLIC_PULSE_VOICE_ID_PANEL || "JBFqnCBsd6RMkjVDRZzb";
 
   useEffect(() => {
     try {
@@ -1058,6 +1066,16 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
     setUcatAttempts((prev) => prev.filter((item) => item.id !== id));
   }
 
+  function handleVoiceTranscriptFinalized(text: string) {
+    setCurrentResponse(text);
+  }
+
+  function resetCurrentDraft() {
+    setCurrentResponse("");
+    setCurrentResponses([]);
+    setCurrentQuestionIndex(0);
+  }
+
   function generateNewPrompt() {
     setLatestFeedback(null);
     setCurrentResponse("");
@@ -1220,42 +1238,6 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
     }
   }
 
-  function startVoiceRecording() {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      alert("Speech recognition is not supported in this browser. Chrome usually works best.");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-AU";
-    recognition.continuous = true;
-    recognition.interimResults = true;
-
-    recognition.onresult = (event: any) => {
-      let transcript = "";
-      for (let i = 0; i < event.results.length; i += 1) {
-        transcript += event.results[i][0].transcript + " ";
-      }
-      setCurrentResponse(transcript.trim());
-    };
-
-    recognition.onend = () => {
-      setIsRecording(false);
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsRecording(true);
-  }
-
-  function stopVoiceRecording() {
-    recognitionRef.current?.stop?.();
-    setIsRecording(false);
-  }
-
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -1288,7 +1270,8 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
                   Train
                 </h1>
                 <p className="mt-2 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
-                  Build skills and track measurable progress with a cleaner, more dynamic preparation suite for UCAT, ATAR strategy, and interview development.
+                  Build skills and track measurable progress with a cleaner, more dynamic preparation
+                  suite for UCAT, ATAR strategy, and interview development.
                 </p>
               </div>
             </div>
@@ -1309,7 +1292,11 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
               <PracticeMetricTile
                 label="Personal best"
                 value={`${Math.round(personalBest)}`}
-                sub={recentMomentum === 0 ? "No momentum yet" : `${recentMomentum > 0 ? "+" : ""}${recentMomentum} vs previous`}
+                sub={
+                  recentMomentum === 0
+                    ? "No momentum yet"
+                    : `${recentMomentum > 0 ? "+" : ""}${recentMomentum} vs previous`
+                }
                 tone="violet"
               />
             </div>
@@ -1412,8 +1399,16 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
                       <div className="mt-6 space-y-5">
                         <ProgressBar label="ATAR readiness" value={atarSelfReadiness} tone="blue" />
                         <ProgressBar label="UCAT readiness" value={ucatReadiness} tone="violet" />
-                        <ProgressBar label="Interview readiness" value={interviewAverage} tone="emerald" />
-                        <ProgressBar label="Application readiness" value={applicationReadiness} tone="amber" />
+                        <ProgressBar
+                          label="Interview readiness"
+                          value={interviewAverage}
+                          tone="emerald"
+                        />
+                        <ProgressBar
+                          label="Application readiness"
+                          value={applicationReadiness}
+                          tone="amber"
+                        />
                         <ProgressBar label="Story bank strength" value={storyBankScore} />
                       </div>
                     </Card>
@@ -1518,7 +1513,6 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
                       icon={Target}
                     />
                   </div>
-
                   <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
                     <Card className="p-6">
                       <div className="flex items-center justify-between gap-4">
@@ -1800,7 +1794,8 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
                   </div>
                 </>
               )}
-                            {activeTab === "interview" && (
+
+              {activeTab === "interview" && (
                 <>
                   <div className="flex flex-wrap gap-3">
                     <button
@@ -1882,16 +1877,21 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
                                   Interview studio
                                 </h3>
                                 <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
-                                  Start a timed station, draft your answer, then save a scored attempt so you can actually track progress over time.
+                                  Start a timed station, draft your answer, then save a scored attempt so
+                                  you can actually track progress over time.
                                 </p>
                               </div>
 
                               <div className="flex flex-wrap gap-2">
                                 <SoftBadge tone="emerald">{sessionTheme}</SoftBadge>
                                 <SoftBadge tone="blue">
-                                  {interviewMode === "MMI" ? "Multi-question flow" : "Single-answer flow"}
+                                  {interviewMode === "MMI"
+                                    ? "Multi-question flow"
+                                    : "Single-answer flow"}
                                 </SoftBadge>
-                                {isRecording ? <SoftBadge tone="rose">Voice active</SoftBadge> : null}
+                                {(currentPrompt || currentPanelPrompt) ? (
+                                  <SoftBadge tone="violet">Pulse ready</SoftBadge>
+                                ) : null}
                               </div>
                             </div>
 
@@ -1910,7 +1910,7 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
                               />
                             </div>
 
-                            <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+                            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
                               <button
                                 type="button"
                                 onClick={generateNewPrompt}
@@ -1928,26 +1928,6 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
                                 <Clock3 className="h-4 w-4" />
                                 {isRunningTimer ? "Pause timer" : "Resume timer"}
                               </button>
-
-                              {!isRecording ? (
-                                <button
-                                  type="button"
-                                  onClick={startVoiceRecording}
-                                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                                >
-                                  <Mic className="h-4 w-4" />
-                                  Voice input
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={stopVoiceRecording}
-                                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
-                                >
-                                  <Pause className="h-4 w-4" />
-                                  Stop voice
-                                </button>
-                              )}
                             </div>
 
                             <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
@@ -1985,7 +1965,9 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
                                 <div className="h-2 rounded-full bg-slate-200">
                                   <div
                                     className="h-2 rounded-full bg-linear-to-r from-emerald-500 via-sky-500 to-violet-500 transition-all"
-                                    style={{ width: `${Math.max(0, Math.min(100, sessionProgress))}%` }}
+                                    style={{
+                                      width: `${Math.max(0, Math.min(100, sessionProgress))}%`,
+                                    }}
                                   />
                                 </div>
                               </div>
@@ -2048,6 +2030,23 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
                                 </div>
                               )}
 
+                              {(currentPrompt || currentPanelPrompt) && (
+                                <div className="mt-5">
+                                  <TrainVoicePanel
+                                    question={
+                                      interviewMode === "MMI"
+                                        ? currentPrompt?.questions[currentQuestionIndex] || ""
+                                        : currentPanelPrompt?.prompt || ""
+                                    }
+                                    selectedVoiceId={
+                                      interviewMode === "MMI" ? pulseVoiceIdMmi : pulseVoiceIdPanel
+                                    }
+                                    profile={interviewMode === "MMI" ? "mmi" : "panel"}
+                                    onTranscriptFinalized={handleVoiceTranscriptFinalized}
+                                  />
+                                </div>
+                              )}
+
                               {!currentPrompt && !currentPanelPrompt && (
                                 <div className="mt-5 rounded-3xl border border-dashed border-slate-300 bg-white p-6 text-center">
                                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
@@ -2104,10 +2103,10 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
                                 tone="blue"
                               />
                               <PracticeMetricTile
-                                label="Recording"
-                                value={isRecording ? "Live" : "Off"}
-                                sub={isRecording ? "Voice transcript updating" : "Keyboard only"}
-                                tone={isRecording ? "rose" : "slate"}
+                                label="Voice mode"
+                                value="Pulse"
+                                sub="Use the voice panel on the left"
+                                tone="violet"
                               />
                             </div>
 
@@ -2131,7 +2130,7 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
                                   {isEvaluating
                                     ? "Evaluating..."
                                     : currentPrompt &&
-                                      currentQuestionIndex === currentPrompt.questions.length - 1
+                                        currentQuestionIndex === currentPrompt.questions.length - 1
                                       ? "Finish and evaluate"
                                       : "Save and next"}
                                   <ChevronRight className="h-4 w-4" />
@@ -2150,11 +2149,7 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
 
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setCurrentResponse("");
-                                  setCurrentResponses([]);
-                                  setCurrentQuestionIndex(0);
-                                }}
+                                onClick={resetCurrentDraft}
                                 className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
                               >
                                 Reset draft
@@ -2191,7 +2186,10 @@ const supabase = useMemo(() => createClient(getToken), [getToken]);
                                   <ScoreChip label="Reasoning" value={latestFeedback.reasoning} />
                                   <ScoreChip label="Empathy" value={latestFeedback.empathy} />
                                   <ScoreChip label="Structure" value={latestFeedback.structure} />
-                                  <ScoreChip label="Professionalism" value={latestFeedback.professionalism} />
+                                  <ScoreChip
+                                    label="Professionalism"
+                                    value={latestFeedback.professionalism}
+                                  />
                                   <ScoreChip label="Overall" value={latestFeedback.overall} />
                                 </div>
 
