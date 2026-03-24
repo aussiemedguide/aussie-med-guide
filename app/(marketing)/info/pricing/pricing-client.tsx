@@ -139,18 +139,22 @@ function PricingCard({
   const isCurrentPlan = isCurrentFree || isCurrentPaid;
 
   const buttonLabel = !isPaidPlan
-    ? isCurrentFree
-      ? "Current Plan"
-      : "Free Plan"
-    : isCurrentPaid
-      ? "Current Subscription"
-      : isSignedIn
-        ? plan.cta
-        : "Sign in to continue";
+  ? isCurrentFree
+    ? "Current Plan"
+    : "Downgrade to Free"
+  : isCurrentPaid
+    ? "Current Plan"
+    : currentPlan === "pro_monthly" && plan.planKey === "pro_annual"
+      ? "Switch to Annual"
+      : currentPlan === "pro_annual" && plan.planKey === "pro_monthly"
+        ? "Switch to Monthly"
+        : isSignedIn
+          ? "Continue to payment"
+          : "Sign in to continue";
 
   const buttonDisabled = !isPaidPlan
-    ? false
-    : isCurrentPaid || isLoading || !accepted;
+  ? isCurrentFree
+  : isCurrentPaid || isLoading || (!accepted && !isCurrentPaid);
 
   return (
     <motion.div
