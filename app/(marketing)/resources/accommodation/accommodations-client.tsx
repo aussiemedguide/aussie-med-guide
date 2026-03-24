@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import SignOutButton from "@/components/auth/sign-out-button";
 import dynamic from "next/dynamic";
 import {
   BedDouble,

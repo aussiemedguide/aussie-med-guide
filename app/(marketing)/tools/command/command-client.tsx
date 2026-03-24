@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import SignOutButton from "@/components/auth/sign-out-button";
 import { useSession } from "@clerk/nextjs";
 import { createClient } from "@/lib/supabase/client";
 import {

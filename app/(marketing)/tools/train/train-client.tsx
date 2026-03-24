@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
+import SignOutButton from "@/components/auth/sign-out-button";
 import { useScribe } from "@elevenlabs/react";
 import PulseOrb from "@/components/train/PulseOrb";
 import { createClient } from "@/lib/supabase/client";

@@ -2,6 +2,7 @@
 
 import type { ComponentType, ReactNode } from "react";
 import Link from "next/link";
+import SignOutButton from "@/components/auth/sign-out-button";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,

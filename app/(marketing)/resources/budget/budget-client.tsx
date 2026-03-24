@@ -1,6 +1,7 @@
 "use client";
 
 import type { ComponentType, ReactNode } from "react";
+import SignOutButton from "@/components/auth/sign-out-button";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
