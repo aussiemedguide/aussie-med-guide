@@ -661,7 +661,9 @@ function PracticeMetricTile({
 
   return (
     <div className={cn("rounded-2xl border p-4", tones[tone])}>
-      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">{label}</div>
+      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+        {label}
+      </div>
       <div className="mt-2 text-2xl font-black tracking-tight text-slate-950">{value}</div>
       <div className="mt-1 text-xs text-slate-600">{sub}</div>
     </div>
@@ -874,145 +876,140 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
   });
 
   const pulseVoiceIdMmi =
-  process.env.NEXT_PUBLIC_PULSE_VOICE_ID_MMI || "JBFqnCBsd6RMkjVDRZzb";
-
+    process.env.NEXT_PUBLIC_PULSE_VOICE_ID_MMI || "JBFqnCBsd6RMkjVDRZzb";
   const pulseVoiceIdPanel =
-  process.env.NEXT_PUBLIC_PULSE_VOICE_ID_PANEL || "JBFqnCBsd6RMkjVDRZzb";
+    process.env.NEXT_PUBLIC_PULSE_VOICE_ID_PANEL || "JBFqnCBsd6RMkjVDRZzb";
 
-  const [pulseMode, setPulseMode] = useState<"idle" | "speaking" | "listening" | "processing">("idle");
+  const [pulseMode, setPulseMode] = useState<"idle" | "speaking" | "listening" | "processing">(
+    "idle"
+  );
   const [voiceModeEnabled, setVoiceModeEnabled] = useState(true);
   const [autoPlayQuestion, setAutoPlayQuestion] = useState(true);
-  
-  const currentVoiceId =
-  interviewMode === "MMI" ? pulseVoiceIdMmi : pulseVoiceIdPanel;
-  
+
+  const currentVoiceId = interviewMode === "MMI" ? pulseVoiceIdMmi : pulseVoiceIdPanel;
   const currentVoiceProfile = interviewMode === "MMI" ? "mmi" : "panel";
-  
   const currentQuestionText =
-  interviewMode === "MMI"
-    ? currentPrompt?.questions[currentQuestionIndex] || ""
-    : currentPanelPrompt?.prompt || "";
-    
+    interviewMode === "MMI"
+      ? currentPrompt?.questions[currentQuestionIndex] || ""
+      : currentPanelPrompt?.prompt || "";
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
-const committedTranscriptRef = useRef("");
+  const committedTranscriptRef = useRef("");
 
-const scribe = useScribe({
-  modelId: "scribe_v2_realtime",
-  onPartialTranscript: (data) => {
-    setPulseMode("listening");
+  const scribe = useScribe({
+    modelId: "scribe_v2_realtime",
+    onPartialTranscript: (data) => {
+      setPulseMode("listening");
 
-    const partialText =
-      typeof data === "string"
-        ? data
-        : typeof data?.text === "string"
-          ? data.text
-          : "";
+      const partialText =
+        typeof data === "string"
+          ? data
+          : typeof data?.text === "string"
+            ? data.text
+            : "";
 
-    setCurrentResponse(
-      [committedTranscriptRef.current, partialText].filter(Boolean).join(" ").trim()
-    );
-  },
-  onCommittedTranscript: (data) => {
-    const committedText =
-      typeof data === "string"
-        ? data
-        : typeof data?.text === "string"
-          ? data.text
-          : "";
+      setCurrentResponse(
+        [committedTranscriptRef.current, partialText].filter(Boolean).join(" ").trim()
+      );
+    },
+    onCommittedTranscript: (data) => {
+      const committedText =
+        typeof data === "string"
+          ? data
+          : typeof data?.text === "string"
+            ? data.text
+            : "";
 
-    committedTranscriptRef.current = [
-      committedTranscriptRef.current,
-      committedText,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .trim();
+      committedTranscriptRef.current = [committedTranscriptRef.current, committedText]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
 
-    setCurrentResponse(committedTranscriptRef.current);
-  },
-});
+      setCurrentResponse(committedTranscriptRef.current);
+    },
+  });
 
-async function speakCurrentQuestion() {
-  if (!voiceModeEnabled || !currentQuestionText || !currentVoiceId) return;
+  async function speakCurrentQuestion() {
+    if (!voiceModeEnabled || !currentQuestionText || !currentVoiceId) return;
 
-  setPulseMode("speaking");
+    setPulseMode("speaking");
 
-  try {
-    const res = await fetch("/api/train/voice/question", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        text: currentQuestionText,
-        voiceId: currentVoiceId,
-        profile: currentVoiceProfile,
-      }),
-    });
+    try {
+      const res = await fetch("/api/train/voice/question", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: currentQuestionText,
+          voiceId: currentVoiceId,
+          profile: currentVoiceProfile,
+        }),
+      });
 
-    if (!res.ok) {
-      throw new Error("Failed to load question audio");
-    }
+      if (!res.ok) {
+        throw new Error("Failed to load question audio");
+      }
 
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
 
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
 
-    const audio = new Audio(url);
-    audioRef.current = audio;
+      const audio = new Audio(url);
+      audioRef.current = audio;
 
-    audio.onended = () => {
+      audio.onended = () => {
+        setPulseMode("idle");
+        URL.revokeObjectURL(url);
+      };
+
+      await audio.play();
+    } catch (error) {
+      console.error(error);
       setPulseMode("idle");
-      URL.revokeObjectURL(url);
-    };
-
-    await audio.play();
-  } catch (error) {
-    console.error(error);
-    setPulseMode("idle");
-  }
-}
-
-async function startVoiceAnswer() {
-  try {
-    committedTranscriptRef.current = currentResponse.trim();
-    setPulseMode("listening");
-
-    const tokenRes = await fetch("/api/train/voice/scribe-token", {
-      method: "GET",
-    });
-
-    if (!tokenRes.ok) {
-      throw new Error("Failed to get scribe token");
     }
+  }
 
-    const tokenPayload = (await tokenRes.json()) as { token: string };
+  async function startVoiceAnswer() {
+    try {
+      committedTranscriptRef.current = currentResponse.trim();
+      setPulseMode("listening");
 
-    await scribe.connect({
-      token: tokenPayload.token,
-      microphone: {
-        echoCancellation: true,
-        noiseSuppression: true,
-      },
-    });
-  } catch (error) {
-    console.error(error);
+      const tokenRes = await fetch("/api/train/voice/scribe-token", {
+        method: "GET",
+      });
+
+      if (!tokenRes.ok) {
+        throw new Error("Failed to get scribe token");
+      }
+
+      const tokenPayload = (await tokenRes.json()) as { token: string };
+
+      await scribe.connect({
+        token: tokenPayload.token,
+        microphone: {
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      setPulseMode("idle");
+    }
+  }
+
+  function stopVoiceAnswer() {
+    scribe.disconnect();
     setPulseMode("idle");
   }
-}
 
-function stopVoiceAnswer() {
-  scribe.disconnect();
-  setPulseMode("idle");
-}
-
-function clearVoiceTranscript() {
-  committedTranscriptRef.current = "";
-  setCurrentResponse("");
-}
+  function clearVoiceTranscript() {
+    committedTranscriptRef.current = "";
+    setCurrentResponse("");
+  }
 
   useEffect(() => {
     try {
@@ -1085,6 +1082,15 @@ function clearVoiceTranscript() {
 
     return () => window.clearInterval(id);
   }, [isRunningTimer]);
+
+  useEffect(() => {
+    committedTranscriptRef.current = "";
+    setPulseMode("idle");
+
+    if (voiceModeEnabled && autoPlayQuestion && currentQuestionText) {
+      void speakCurrentQuestion();
+    }
+  }, [currentQuestionText, currentVoiceId, currentVoiceProfile, voiceModeEnabled, autoPlayQuestion]);
 
   const latestUcat = ucatAttempts[0] ?? null;
   const averageUcat = Math.round(avg(ucatAttempts.map((x) => x.total)));
@@ -1206,6 +1212,7 @@ function clearVoiceTranscript() {
     setCurrentResponse("");
     setCurrentResponses([]);
     setCurrentQuestionIndex(0);
+    committedTranscriptRef.current = "";
   }
 
   function generateNewPrompt() {
@@ -1215,6 +1222,8 @@ function clearVoiceTranscript() {
     setCurrentQuestionIndex(0);
     setTimerSeconds(0);
     setIsRunningTimer(true);
+    committedTranscriptRef.current = "";
+    setPulseMode("idle");
 
     if (interviewMode === "MMI") {
       const random = mmiPrompts[Math.floor(Math.random() * mmiPrompts.length)];
@@ -1314,15 +1323,19 @@ function clearVoiceTranscript() {
       setCurrentResponses(updated);
       setCurrentQuestionIndex((prev) => prev + 1);
       setCurrentResponse("");
+      committedTranscriptRef.current = "";
     } else {
-      const fullText = updated
+      const finalAnswers = [...updated];
+      finalAnswers[currentQuestionIndex] = currentResponse.trim();
+
+      const fullText = finalAnswers
         .map(
           (answer, index) =>
             `Q${index + 1}: ${currentPrompt.questions[index]}\nA${index + 1}: ${answer}`
         )
         .join("\n\n");
 
-      setCurrentResponses(updated);
+      setCurrentResponses(finalAnswers);
       setIsRunningTimer(false);
       evaluateWithBackend(fullText);
     }
@@ -1449,175 +1462,7 @@ function clearVoiceTranscript() {
                 text="Composite score across academics, UCAT, application confidence, and interview work."
                 onClick={() => setActiveTab("readiness")}
               />
-              <TopTab
-                active={activeTab === "ucat"}
-                icon={Brain}
-                title="UCAT Performance Hub"
-                text="Track mocks, compare totals, and find your weakest subtest quickly."
-                onClick={() => setActiveTab("ucat")}
-              />
-              <TopTab
-                active={activeTab === "atar"}
-                icon={GraduationCap}
-                title="ATAR Risk Management"
-                text="See how state systems and subject choices might shape your academic risk."
-                onClick={() => setActiveTab("atar")}
-              />
-              <TopTab
-                active={activeTab === "interview"}
-                icon={Users}
-                title="Interview Practice System"
-                text="Generate prompts, record responses, and review rubric-based feedback."
-                onClick={() => setActiveTab("interview")}
-              />
-            </div>
-
-            <div className="mt-6 space-y-6">
-              {activeTab === "readiness" && (
-                <>
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <StatCard
-                      label="Overall readiness"
-                      value={`${overallReadiness}`}
-                      hint={getReadinessBand(overallReadiness)}
-                      icon={Target}
-                    />
-                    <StatCard
-                      label="Average UCAT"
-                      value={averageUcat ? `${averageUcat}` : "—"}
-                      hint={latestUcat ? `Latest: ${latestUcat.total}` : "No mocks logged yet"}
-                      icon={Brain}
-                    />
-                    <StatCard
-                      label="Interview average"
-                      value={`${Math.round(interviewAverage)}`}
-                      hint={`${practiceHistory.length} saved attempts`}
-                      icon={Users}
-                    />
-                    <StatCard
-                      label="Story bank"
-                      value={`${stories.length}`}
-                      hint="Examples ready for interviews"
-                      icon={Wand2}
-                    />
-                  </div>
-
-                  <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-                    <Card className="p-6">
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold uppercase tracking-wider text-emerald-600">
-                            Composite readiness
-                          </p>
-                          <h2 className="mt-2 text-2xl font-bold text-slate-950">
-                            {getReadinessBand(overallReadiness)}
-                          </h2>
-                          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                            This blends your self-rated academic readiness, UCAT performance,
-                            interview history, application confidence, and story-bank depth.
-                          </p>
-                        </div>
-
-                        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-right">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
-                            Current score
-                          </p>
-                          <p className="mt-1 text-3xl font-bold text-emerald-700">
-                            {overallReadiness}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-6 space-y-5">
-                        <ProgressBar label="ATAR readiness" value={atarSelfReadiness} tone="blue" />
-                        <ProgressBar label="UCAT readiness" value={ucatReadiness} tone="violet" />
-                        <ProgressBar
-                          label="Interview readiness"
-                          value={interviewAverage}
-                          tone="emerald"
-                        />
-                        <ProgressBar
-                          label="Application readiness"
-                          value={applicationReadiness}
-                          tone="amber"
-                        />
-                        <ProgressBar label="Story bank strength" value={storyBankScore} />
-                      </div>
-                    </Card>
-
-                    <div className="space-y-6">
-                      <Card className="p-6">
-                        <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-                          Priority focus
-                        </p>
-                        <h3 className="mt-2 text-xl font-bold text-slate-950">
-                          Improve your {readinessFocus.key}
-                        </h3>
-                        <p className="mt-2 text-sm leading-6 text-slate-600">
-                          This is currently your lowest-scoring pillar, so improving it will lift
-                          your overall readiness fastest.
-                        </p>
-                        <div className="mt-4 rounded-2xl bg-slate-50 p-4">
-                          <p className="text-sm font-medium text-slate-700">
-                            Current score:{" "}
-                            <span className="font-bold text-slate-950">
-                              {Math.round(readinessFocus.value)}/100
-                            </span>
-                          </p>
-                        </div>
-                      </Card>
-
-                      <Card className="p-6">
-                        <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-                          Adjust confidence inputs
-                        </p>
-
-                        <div className="mt-5 space-y-5">
-                          <div>
-                            <div className="mb-2 flex items-center justify-between">
-                              <label className="text-sm font-medium text-slate-700">
-                                ATAR self-readiness
-                              </label>
-                              <span className="text-sm font-semibold text-slate-900">
-                                {atarSelfReadiness}/100
-                              </span>
-                            </div>
-                            <input
-                              type="range"
-                              min={0}
-                              max={100}
-                              value={atarSelfReadiness}
-                              onChange={(e) => setAtarSelfReadiness(Number(e.target.value))}
-                              className="w-full"
-                            />
-                          </div>
-
-                          <div>
-                            <div className="mb-2 flex items-center justify-between">
-                              <label className="text-sm font-medium text-slate-700">
-                                Application readiness
-                              </label>
-                              <span className="text-sm font-semibold text-slate-900">
-                                {applicationReadiness}/100
-                              </span>
-                            </div>
-                            <input
-                              type="range"
-                              min={0}
-                              max={100}
-                              value={applicationReadiness}
-                              onChange={(e) => setApplicationReadiness(Number(e.target.value))}
-                              className="w-full"
-                            />
-                          </div>
-                        </div>
-                      </Card>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {activeTab === "ucat" && (
+               {activeTab === "ucat" && (
                 <>
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <StatCard
@@ -1645,6 +1490,7 @@ function clearVoiceTranscript() {
                       icon={Target}
                     />
                   </div>
+
                   <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
                     <Card className="p-6">
                       <div className="flex items-center justify-between gap-4">
@@ -1793,7 +1639,7 @@ function clearVoiceTranscript() {
                     </Card>
                   </div>
                 </>
-              )}
+              )})
 
               {activeTab === "atar" && (
                 <>
@@ -2163,19 +2009,57 @@ function clearVoiceTranscript() {
                               )}
 
                               {(currentPrompt || currentPanelPrompt) && (
-                                <div className="mt-5">
-                                  <TrainVoicePanel
-                                    question={
-                                      interviewMode === "MMI"
-                                        ? currentPrompt?.questions[currentQuestionIndex] || ""
-                                        : currentPanelPrompt?.prompt || ""
-                                    }
-                                    selectedVoiceId={
-                                      interviewMode === "MMI" ? pulseVoiceIdMmi : pulseVoiceIdPanel
-                                    }
-                                    profile={interviewMode === "MMI" ? "mmi" : "panel"}
-                                    onTranscriptFinalized={handleVoiceTranscriptFinalized}
-                                  />
+                                <div className="mt-5 rounded-3xl border border-slate-200 bg-linear-to-b from-slate-950 via-slate-900 to-slate-950 p-5 text-white shadow-sm">
+                                  <div className="flex items-center justify-between gap-4">
+                                    <div>
+                                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                        Voice interviewer
+                                      </p>
+                                      <h3 className="mt-1 text-xl font-semibold text-white">Pulse</h3>
+                                      <p className="mt-1 text-sm text-slate-300">
+                                        {interviewMode === "MMI"
+                                          ? "Pulse reads the MMI station aloud."
+                                          : "Pulse reads the panel question aloud."}
+                                      </p>
+                                    </div>
+
+                                    <PulseOrb mode={pulseMode} enabled={voiceModeEnabled} />
+                                  </div>
+
+                                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                                    <label className="flex items-center justify-between rounded-2xl border border-slate-700 px-4 py-3">
+                                      <span className="text-sm font-medium text-slate-200">
+                                        Voice mode
+                                      </span>
+                                      <input
+                                        type="checkbox"
+                                        checked={voiceModeEnabled}
+                                        onChange={(e) => setVoiceModeEnabled(e.target.checked)}
+                                      />
+                                    </label>
+
+                                    <label className="flex items-center justify-between rounded-2xl border border-slate-700 px-4 py-3">
+                                      <span className="text-sm font-medium text-slate-200">
+                                        Auto-play question
+                                      </span>
+                                      <input
+                                        type="checkbox"
+                                        checked={autoPlayQuestion}
+                                        onChange={(e) => setAutoPlayQuestion(e.target.checked)}
+                                      />
+                                    </label>
+                                  </div>
+
+                                  <div className="mt-4 flex flex-wrap gap-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => void speakCurrentQuestion()}
+                                      disabled={!voiceModeEnabled || !currentQuestionText}
+                                      className="rounded-full border border-slate-600 px-4 py-2 text-sm font-medium text-slate-100 disabled:opacity-50"
+                                    >
+                                      Replay question
+                                    </button>
+                                  </div>
                                 </div>
                               )}
 
@@ -2207,7 +2091,8 @@ function clearVoiceTranscript() {
                                   Build your answer live
                                 </h3>
                                 <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
-                                  Write or dictate your answer, then save the station and turn it into a scored attempt.
+                                  Write or dictate your answer, then save the station and turn it into
+                                  a scored attempt.
                                 </p>
                               </div>
 
@@ -2235,11 +2120,52 @@ function clearVoiceTranscript() {
                                 tone="blue"
                               />
                               <PracticeMetricTile
-                                label="Voice mode"
-                                value="Pulse"
-                                sub="Use the voice panel on the left"
-                                tone="violet"
+                                label="Voice input"
+                                value={scribe.isConnected ? "Listening" : "Ready"}
+                                sub={
+                                  scribe.isConnected
+                                    ? "Live transcript running"
+                                    : "Press start voice"
+                                }
+                                tone={scribe.isConnected ? "rose" : "violet"}
                               />
+                            </div>
+
+                            <div className="flex flex-wrap gap-3">
+                              <button
+                                type="button"
+                                onClick={() => void startVoiceAnswer()}
+                                disabled={scribe.isConnected}
+                                className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                              >
+                                Start voice
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={stopVoiceAnswer}
+                                disabled={!scribe.isConnected}
+                                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50"
+                              >
+                                Stop voice
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={clearVoiceTranscript}
+                                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+                              >
+                                Clear transcript
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => void speakCurrentQuestion()}
+                                disabled={!voiceModeEnabled || !currentQuestionText}
+                                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50"
+                              >
+                                Replay question
+                              </button>
                             </div>
 
                             <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-3">
@@ -2358,7 +2284,8 @@ function clearVoiceTranscript() {
                           Save your best examples
                         </h3>
                         <p className="mt-2 text-sm leading-6 text-slate-600">
-                          Build a library of leadership, teamwork, resilience, empathy, and ethics examples you can adapt in interviews.
+                          Build a library of leadership, teamwork, resilience, empathy, and ethics
+                          examples you can adapt in interviews.
                         </p>
 
                         <div className="mt-5 space-y-4">
