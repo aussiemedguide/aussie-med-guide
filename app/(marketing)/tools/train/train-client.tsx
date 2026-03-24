@@ -1455,323 +1455,491 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
         ) : (
           <>
             <div className="mt-6 grid gap-3 md:grid-cols-4">
-              <TopTab
-                active={activeTab === "readiness"}
-                icon={Target}
-                title="Overall Readiness Score"
-                text="Composite score across academics, UCAT, application confidence, and interview work."
-                onClick={() => setActiveTab("readiness")}
+  <TopTab
+    active={activeTab === "readiness"}
+    icon={Target}
+    title="Overall Readiness Score"
+    text="Composite score across academics, UCAT, application confidence, and interview work."
+    onClick={() => setActiveTab("readiness")}
+  />
+  <TopTab
+    active={activeTab === "ucat"}
+    icon={Brain}
+    title="UCAT Performance Hub"
+    text="Track mocks, compare totals, and find your weakest subtest quickly."
+    onClick={() => setActiveTab("ucat")}
+  />
+  <TopTab
+    active={activeTab === "atar"}
+    icon={GraduationCap}
+    title="ATAR Risk Management"
+    text="See how state systems and subject choices might shape your academic risk."
+    onClick={() => setActiveTab("atar")}
+  />
+  <TopTab
+    active={activeTab === "interview"}
+    icon={Users}
+    title="Interview Practice System"
+    text="Generate prompts, record responses, and review rubric-based feedback."
+    onClick={() => setActiveTab("interview")}
+  />
+</div>
+
+<div className="mt-6 space-y-6">
+  {activeTab === "readiness" && (
+    <>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Overall readiness"
+          value={`${overallReadiness}`}
+          hint={getReadinessBand(overallReadiness)}
+          icon={Target}
+        />
+        <StatCard
+          label="Average UCAT"
+          value={averageUcat ? `${averageUcat}` : "—"}
+          hint={latestUcat ? `Latest: ${latestUcat.total}` : "No mocks logged yet"}
+          icon={Brain}
+        />
+        <StatCard
+          label="Interview average"
+          value={`${Math.round(interviewAverage)}`}
+          hint={`${practiceHistory.length} saved attempts`}
+          icon={Users}
+        />
+        <StatCard
+          label="Story bank"
+          value={`${stories.length}`}
+          hint="Examples ready for interviews"
+          icon={Wand2}
+        />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <Card className="p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wider text-emerald-600">
+                Composite readiness
+              </p>
+              <h2 className="mt-2 text-2xl font-bold text-slate-950">
+                {getReadinessBand(overallReadiness)}
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                This blends your self-rated academic readiness, UCAT performance,
+                interview history, application confidence, and story-bank depth.
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-right">
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+                Current score
+              </p>
+              <p className="mt-1 text-3xl font-bold text-emerald-700">
+                {overallReadiness}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-5">
+            <ProgressBar label="ATAR readiness" value={atarSelfReadiness} tone="blue" />
+            <ProgressBar label="UCAT readiness" value={ucatReadiness} tone="violet" />
+            <ProgressBar
+              label="Interview readiness"
+              value={interviewAverage}
+              tone="emerald"
+            />
+            <ProgressBar
+              label="Application readiness"
+              value={applicationReadiness}
+              tone="amber"
+            />
+            <ProgressBar label="Story bank strength" value={storyBankScore} />
+          </div>
+        </Card>
+
+        <div className="space-y-6">
+          <Card className="p-6">
+            <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+              Priority focus
+            </p>
+            <h3 className="mt-2 text-xl font-bold text-slate-950">
+              Improve your {readinessFocus.key}
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              This is currently your lowest-scoring pillar, so improving it will lift
+              your overall readiness fastest.
+            </p>
+            <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+              <p className="text-sm font-medium text-slate-700">
+                Current score:{" "}
+                <span className="font-bold text-slate-950">
+                  {Math.round(readinessFocus.value)}/100
+                </span>
+              </p>
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+              Adjust confidence inputs
+            </p>
+
+            <div className="mt-5 space-y-5">
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-medium text-slate-700">
+                    ATAR self-readiness
+                  </label>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {atarSelfReadiness}/100
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={atarSelfReadiness}
+                  onChange={(e) => setAtarSelfReadiness(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-medium text-slate-700">
+                    Application readiness
+                  </label>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {applicationReadiness}/100
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={applicationReadiness}
+                  onChange={(e) => setApplicationReadiness(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </>
+  )}
+
+  {activeTab === "ucat" && (
+    <>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Latest total"
+          value={latestUcat ? `${latestUcat.total}` : "—"}
+          hint={latestUcat ? formatDate(latestUcat.date) : "No attempt added yet"}
+          icon={Brain}
+        />
+        <StatCard
+          label="Average total"
+          value={averageUcat ? `${averageUcat}` : "—"}
+          hint={`${ucatAttempts.length} recorded attempts`}
+          icon={LineChart}
+        />
+        <StatCard
+          label="Weakest subtest"
+          value={weakSubtest}
+          hint="Based on your latest logged mock"
+          icon={CircleAlert}
+        />
+        <StatCard
+          label="Readiness score"
+          value={`${ucatReadiness}`}
+          hint="Converted from your latest total"
+          icon={Target}
+        />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <Card className="p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                Add new result
+              </p>
+              <h3 className="mt-2 text-xl font-bold text-slate-950">
+                Log a UCAT mock
+              </h3>
+            </div>
+
+            <div className="rounded-2xl bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700">
+              Track trends, not one-off highs
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Date
+              </label>
+              <input
+                type="date"
+                value={ucatForm.date}
+                onChange={(e) =>
+                  setUcatForm((prev) => ({ ...prev, date: e.target.value }))
+                }
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
               />
-               {activeTab === "ucat" && (
-                <>
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <StatCard
-                      label="Latest total"
-                      value={latestUcat ? `${latestUcat.total}` : "—"}
-                      hint={latestUcat ? formatDate(latestUcat.date) : "No attempt added yet"}
-                      icon={Brain}
-                    />
-                    <StatCard
-                      label="Average total"
-                      value={averageUcat ? `${averageUcat}` : "—"}
-                      hint={`${ucatAttempts.length} recorded attempts`}
-                      icon={LineChart}
-                    />
-                    <StatCard
-                      label="Weakest subtest"
-                      value={weakSubtest}
-                      hint="Based on your latest logged mock"
-                      icon={CircleAlert}
-                    />
-                    <StatCard
-                      label="Readiness score"
-                      value={`${ucatReadiness}`}
-                      hint="Converted from your latest total"
-                      icon={Target}
-                    />
-                  </div>
+            </div>
 
-                  <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-                    <Card className="p-6">
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-                            Add new result
-                          </p>
-                          <h3 className="mt-2 text-xl font-bold text-slate-950">
-                            Log a UCAT mock
-                          </h3>
-                        </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Label
+              </label>
+              <input
+                type="text"
+                value={ucatForm.label}
+                onChange={(e) =>
+                  setUcatForm((prev) => ({ ...prev, label: e.target.value }))
+                }
+                placeholder="Mock, official, timed practice"
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
+              />
+            </div>
 
-                        <div className="rounded-2xl bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700">
-                          Track trends, not one-off highs
-                        </div>
+            {[
+              ["Total", "total"],
+              ["VR", "vr"],
+              ["DM", "dm"],
+              ["QR", "qr"],
+              ["AR", "ar"],
+              ["SJT", "sjt"],
+            ].map(([label, key]) => (
+              <div key={key}>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  {label}
+                </label>
+                <input
+                  type="number"
+                  value={ucatForm[key as keyof UcatAttempt] as number}
+                  onChange={(e) =>
+                    setUcatForm((prev) => ({
+                      ...prev,
+                      [key]: Number(e.target.value),
+                    }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
+                />
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={addUcatResult}
+            className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
+          >
+            <Plus className="h-4 w-4" />
+            Save result
+          </button>
+        </Card>
+
+        <Card className="p-6">
+          <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+            Result history
+          </p>
+          <h3 className="mt-2 text-xl font-bold text-slate-950">
+            Your recorded mocks
+          </h3>
+
+          <div className="mt-5 space-y-3">
+            {ucatAttempts.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 p-5 text-sm text-slate-600">
+                No UCAT attempts yet. Add your first mock to start tracking progress.
+              </div>
+            ) : (
+              ucatAttempts.map((attempt) => (
+                <div
+                  key={attempt.id}
+                  className="rounded-2xl border border-slate-200 p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {attempt.label || "UCAT Attempt"}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {formatDate(attempt.date)}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-2xl bg-violet-50 px-3 py-2 text-sm font-bold text-violet-700">
+                        {attempt.total}
                       </div>
-
-                      <div className="mt-6 grid gap-4 md:grid-cols-2">
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-slate-700">
-                            Date
-                          </label>
-                          <input
-                            type="date"
-                            value={ucatForm.date}
-                            onChange={(e) =>
-                              setUcatForm((prev) => ({ ...prev, date: e.target.value }))
-                            }
-                            className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-slate-700">
-                            Label
-                          </label>
-                          <input
-                            type="text"
-                            value={ucatForm.label}
-                            onChange={(e) =>
-                              setUcatForm((prev) => ({ ...prev, label: e.target.value }))
-                            }
-                            placeholder="Mock, official, timed practice"
-                            className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
-                          />
-                        </div>
-
-                        {[
-                          ["Total", "total"],
-                          ["VR", "vr"],
-                          ["DM", "dm"],
-                          ["QR", "qr"],
-                          ["AR", "ar"],
-                          ["SJT", "sjt"],
-                        ].map(([label, key]) => (
-                          <div key={key}>
-                            <label className="mb-2 block text-sm font-medium text-slate-700">
-                              {label}
-                            </label>
-                            <input
-                              type="number"
-                              value={ucatForm[key as keyof UcatAttempt] as number}
-                              onChange={(e) =>
-                                setUcatForm((prev) => ({
-                                  ...prev,
-                                  [key]: Number(e.target.value),
-                                }))
-                              }
-                              className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
-                            />
-                          </div>
-                        ))}
-                      </div>
-
                       <button
                         type="button"
-                        onClick={addUcatResult}
-                        className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
+                        onClick={() => removeUcatResult(attempt.id)}
+                        className="rounded-2xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
                       >
-                        <Plus className="h-4 w-4" />
-                        Save result
+                        <Trash2 className="h-4 w-4" />
                       </button>
-                    </Card>
-
-                    <Card className="p-6">
-                      <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-                        Result history
-                      </p>
-                      <h3 className="mt-2 text-xl font-bold text-slate-950">
-                        Your recorded mocks
-                      </h3>
-
-                      <div className="mt-5 space-y-3">
-                        {ucatAttempts.length === 0 ? (
-                          <div className="rounded-2xl border border-dashed border-slate-300 p-5 text-sm text-slate-600">
-                            No UCAT attempts yet. Add your first mock to start tracking progress.
-                          </div>
-                        ) : (
-                          ucatAttempts.map((attempt) => (
-                            <div
-                              key={attempt.id}
-                              className="rounded-2xl border border-slate-200 p-4"
-                            >
-                              <div className="flex flex-wrap items-start justify-between gap-4">
-                                <div>
-                                  <p className="text-sm font-semibold text-slate-900">
-                                    {attempt.label || "UCAT Attempt"}
-                                  </p>
-                                  <p className="mt-1 text-sm text-slate-500">
-                                    {formatDate(attempt.date)}
-                                  </p>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                  <div className="rounded-2xl bg-violet-50 px-3 py-2 text-sm font-bold text-violet-700">
-                                    {attempt.total}
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeUcatResult(attempt.id)}
-                                    className="rounded-2xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="mt-4 grid grid-cols-5 gap-2 text-center text-xs sm:text-sm">
-                                {[
-                                  ["VR", attempt.vr],
-                                  ["DM", attempt.dm],
-                                  ["QR", attempt.qr],
-                                  ["AR", attempt.ar],
-                                  ["SJT", attempt.sjt],
-                                ].map(([name, value]) => (
-                                  <div key={name} className="rounded-2xl bg-slate-50 p-3">
-                                    <p className="font-medium text-slate-500">{name}</p>
-                                    <p className="mt-1 font-bold text-slate-900">{value}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </Card>
+                    </div>
                   </div>
-                </>
-              )})
 
-              {activeTab === "atar" && (
-                <>
-                  <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-                    <Card className="p-6">
-                      <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-                        State system
-                      </p>
-                      <h3 className="mt-2 text-xl font-bold text-slate-950">
-                        ATAR risk management
-                      </h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
-                        Different states structure scaling and aggregation differently. This is a
-                        strategy view, not a predictor.
-                      </p>
+                  <div className="mt-4 grid grid-cols-5 gap-2 text-center text-xs sm:text-sm">
+                    {[
+                      ["VR", attempt.vr],
+                      ["DM", attempt.dm],
+                      ["QR", attempt.qr],
+                      ["AR", attempt.ar],
+                      ["SJT", attempt.sjt],
+                    ].map(([name, value]) => (
+                      <div key={name} className="rounded-2xl bg-slate-50 p-3">
+                        <p className="font-medium text-slate-500">{name}</p>
+                        <p className="mt-1 font-bold text-slate-900">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </Card>
+      </div>
+    </>
+  )}
 
-                      <div className="mt-5 grid gap-2 sm:grid-cols-2">
-                        {(Object.keys(stateConfigs) as StateKey[]).map((key) => (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => setSelectedState(key)}
-                            className={cn(
-                              "rounded-2xl border px-4 py-3 text-left transition",
-                              selectedState === key
-                                ? "border-emerald-300 bg-emerald-50"
-                                : "border-slate-200 bg-white hover:bg-slate-50"
-                            )}
-                          >
-                            <p className="font-semibold text-slate-900">{stateConfigs[key].label}</p>
-                            <p className="mt-1 text-sm text-slate-500">{stateConfigs[key].short}</p>
-                          </button>
+  {activeTab === "atar" && (
+    <>
+      <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <Card className="p-6">
+          <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+            State system
+          </p>
+          <h3 className="mt-2 text-xl font-bold text-slate-950">
+            ATAR risk management
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Different states structure scaling and aggregation differently. This is a
+            strategy view, not a predictor.
+          </p>
+
+          <div className="mt-5 grid gap-2 sm:grid-cols-2">
+            {(Object.keys(stateConfigs) as StateKey[]).map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSelectedState(key)}
+                className={cn(
+                  "rounded-2xl border px-4 py-3 text-left transition",
+                  selectedState === key
+                    ? "border-emerald-300 bg-emerald-50"
+                    : "border-slate-200 bg-white hover:bg-slate-50"
+                )}
+              >
+                <p className="font-semibold text-slate-900">{stateConfigs[key].label}</p>
+                <p className="mt-1 text-sm text-slate-500">{stateConfigs[key].short}</p>
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+            <p className="text-sm font-semibold text-slate-900">{stateInfo.label}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{stateInfo.summary}</p>
+
+            <ul className="mt-4 space-y-2">
+              {stateInfo.bullets.map((bullet) => (
+                <li key={bullet} className="flex gap-2 text-sm text-slate-700">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />
+                  <span>{bullet}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-5 space-y-2">
+              {stateInfo.links.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <span>{link.label}</span>
+                  <ArrowRight className="h-4 w-4" />
+                </a>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                Subject mix
+              </p>
+              <h3 className="mt-2 text-xl font-bold text-slate-950">
+                Evaluate your subject profile
+              </h3>
+            </div>
+
+            <button
+              type="button"
+              onClick={addSubject}
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <Plus className="h-4 w-4" />
+              Add subject
+            </button>
+          </div>
+
+          <div className="mt-5 space-y-4">
+            {selectedSubjects.map((subject) => {
+              const impact = getSubjectImpact(selectedState, subject.name);
+
+              return (
+                <div key={subject.id} className="rounded-3xl border border-slate-200 p-4">
+                  <div className="flex flex-wrap items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <select
+                        value={subject.name}
+                        onChange={(e) => updateSubject(subject.id, e.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
+                      >
+                        {subjectOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
                         ))}
-                      </div>
+                      </select>
+                    </div>
 
-                      <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                        <p className="text-sm font-semibold text-slate-900">{stateInfo.label}</p>
-                        <p className="mt-2 text-sm leading-6 text-slate-600">{stateInfo.summary}</p>
-
-                        <ul className="mt-4 space-y-2">
-                          {stateInfo.bullets.map((bullet) => (
-                            <li key={bullet} className="flex gap-2 text-sm text-slate-700">
-                              <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />
-                              <span>{bullet}</span>
-                            </li>
-                          ))}
-                        </ul>
-
-                        <div className="mt-5 space-y-2">
-                          {stateInfo.links.map((link) => (
-                            <a
-                              key={link.href}
-                              href={link.href}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                            >
-                              <span>{link.label}</span>
-                              <ArrowRight className="h-4 w-4" />
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    </Card>
-
-                    <Card className="p-6">
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-                            Subject mix
-                          </p>
-                          <h3 className="mt-2 text-xl font-bold text-slate-950">
-                            Evaluate your subject profile
-                          </h3>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={addSubject}
-                          className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Add subject
-                        </button>
-                      </div>
-
-                      <div className="mt-5 space-y-4">
-                        {selectedSubjects.map((subject) => {
-                          const impact = getSubjectImpact(selectedState, subject.name);
-
-                          return (
-                            <div key={subject.id} className="rounded-3xl border border-slate-200 p-4">
-                              <div className="flex flex-wrap items-start gap-3">
-                                <div className="min-w-0 flex-1">
-                                  <select
-                                    value={subject.name}
-                                    onChange={(e) => updateSubject(subject.id, e.target.value)}
-                                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
-                                  >
-                                    {subjectOptions.map((option) => (
-                                      <option key={option} value={option}>
-                                        {option}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-
-                                {selectedSubjects.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removeSubject(subject.id)}
-                                    className="rounded-2xl border border-slate-200 p-3 text-slate-500 hover:bg-slate-50"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                )}
-                              </div>
-
-                              <div className="mt-4 rounded-2xl bg-slate-50 p-4">
-                                <div className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-                                  {impact.tag}
-                                </div>
-                                <p className="mt-2 text-sm leading-6 text-slate-600">{impact.text}</p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </Card>
+                    {selectedSubjects.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeSubject(subject.id)}
+                        className="rounded-2xl border border-slate-200 p-3 text-slate-500 hover:bg-slate-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
-                </>
-              )}
+
+                  <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                    <div className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                      {impact.tag}
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{impact.text}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      </div>
+    </>
+  )}
 
               {activeTab === "interview" && (
                 <>
