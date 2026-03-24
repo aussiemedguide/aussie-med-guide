@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
     if (!priceId) {
       return NextResponse.json(
-        { error: "Missing Stripe price ID in environment variables." },
+        { error: `Missing Stripe price ID for ${plan}.` },
         { status: 500 }
       );
     }
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     const { data: existingSubscription, error: subscriptionError } =
       await supabase
         .from("subscriptions")
-        .select("*")
+        .select("plan, status")
         .eq("clerk_user_id", userId)
         .maybeSingle();
 
@@ -75,32 +75,6 @@ export async function POST(req: Request) {
         { error: "Failed to load subscription record." },
         { status: 500 }
       );
-    }
-
-    if (!existingSubscription) {
-      const { error: createSubscriptionError } = await supabase
-        .from("subscriptions")
-        .insert({
-          clerk_user_id: userId,
-          plan: "free",
-          status: "free",
-          stripe_customer_id: null,
-          stripe_subscription_id: null,
-          stripe_price_id: null,
-          cancel_at_period_end: false,
-          current_period_end: null,
-        });
-
-      if (createSubscriptionError) {
-        console.error(
-          "Failed to create subscription record:",
-          createSubscriptionError
-        );
-        return NextResponse.json(
-          { error: "Failed to create subscription record." },
-          { status: 500 }
-        );
-      }
     }
 
     const alreadyOnRequestedPlan =
@@ -127,18 +101,18 @@ export async function POST(req: Request) {
           quantity: 1,
         },
       ],
-      success_url: `${baseUrl}/info/pricing?success=true`,
-      cancel_url: `${baseUrl}/info/pricing?canceled=true`,
+      success_url: `${baseUrl}/info/pricing?checkout=success`,
+      cancel_url: `${baseUrl}/info/pricing?checkout=cancelled`,
       allow_promotion_codes: true,
       billing_address_collection: "auto",
       metadata: {
         clerk_user_id: userId,
-        plan,
+        selected_plan: plan,
       },
       subscription_data: {
         metadata: {
           clerk_user_id: userId,
-          plan,
+          selected_plan: plan,
         },
       },
     });

@@ -24,6 +24,8 @@ export type FetchedPage = {
 export type NormalizedPage = {
   title: string | null;
   normalizedText: string;
+  excerpt: string;
+  textLength: number;
 };
 
 export type DetectedChange = {
@@ -31,7 +33,7 @@ export type DetectedChange = {
   oldHash: string | null;
   newHash: string;
   oldExcerpt: string | null;
-  newExcerpt: string;
+  newExcerpt: string | null;
   summary: string;
   priority: "low" | "medium" | "high";
 };

@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
     const { data: subscription, error } = await supabase
       .from("subscriptions")
-      .select("stripe_customer_id")
+      .select("stripe_customer_id, plan, status")
       .eq("clerk_user_id", userId)
       .maybeSingle();
 
@@ -69,8 +69,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       {
-        error:
-          error instanceof Error ? error.message : "Unknown portal error",
+        error: error instanceof Error ? error.message : "Unknown portal error",
       },
       { status: 500 }
     );

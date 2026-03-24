@@ -1,8 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/admin/medical-schools/check",
-      "schedule": "0 8 * * *"
+      "path": "/api/admin/medical-schools/run-checks",
+      "schedule": "0 0 */2 * * *"
     }
   ]
 }

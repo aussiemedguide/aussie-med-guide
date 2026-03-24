@@ -14,20 +14,46 @@ const supabase = createClient(
 type AppPlan = "free" | "pro_monthly" | "pro_annual";
 
 type AppStatus =
-  | "free"
   | "trialing"
   | "active"
   | "past_due"
   | "canceled"
   | "unpaid"
   | "incomplete"
-  | "incomplete_expired";
+  | "incomplete_expired"
+  | null;
 
 function getPlanFromPriceId(priceId?: string | null): AppPlan {
   if (!priceId) return "free";
   if (priceId === process.env.STRIPE_PRO_MONTHLY) return "pro_monthly";
   if (priceId === process.env.STRIPE_PRO_ANNUAL) return "pro_annual";
   return "free";
+}
+
+function mapStripeStatus(status?: string | null): AppStatus {
+  if (!status) return null;
+
+  if (
+    status === "trialing" ||
+    status === "active" ||
+    status === "past_due" ||
+    status === "canceled" ||
+    status === "unpaid" ||
+    status === "incomplete" ||
+    status === "incomplete_expired"
+  ) {
+    return status;
+  }
+
+  return null;
+}
+
+function getIsoPeriodEnd(subscription: Stripe.Subscription): string | null {
+  const raw = (subscription as Stripe.Subscription & {
+    current_period_end?: number;
+  }).current_period_end;
+
+  return raw ? new Date(raw * 1000).toISOString() : null;
 }
 
 async function getClerkUserIdFromCustomer(customerId?: string | null) {
@@ -88,6 +114,36 @@ async function upsertSubscriptionRecord(params: {
   }
 }
 
+async function handleSubscriptionUpsert(subscription: Stripe.Subscription) {
+  const stripeCustomerId =
+    typeof subscription.customer === "string" ? subscription.customer : null;
+
+  let clerkUserId = subscription.metadata?.clerk_user_id ?? null;
+
+  if (!clerkUserId) {
+    clerkUserId = await getClerkUserIdFromCustomer(stripeCustomerId);
+  }
+
+  if (!clerkUserId) {
+    throw new Error("Could not resolve clerk_user_id for subscription event.");
+  }
+
+  const stripePriceId = subscription.items.data[0]?.price?.id ?? null;
+  const plan = getPlanFromPriceId(stripePriceId);
+  const status = mapStripeStatus(subscription.status);
+
+  await upsertSubscriptionRecord({
+    clerkUserId,
+    stripeCustomerId,
+    stripeSubscriptionId: subscription.id,
+    stripePriceId,
+    plan,
+    status,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
+    currentPeriodEnd: getIsoPeriodEnd(subscription),
+  });
+}
+
 export async function POST(req: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -129,51 +185,17 @@ export async function POST(req: Request) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
-        const clerkUserId = session.metadata?.clerk_user_id ?? null;
-        const stripeCustomerId =
-          typeof session.customer === "string" ? session.customer : null;
-        const stripeSubscriptionId =
-          typeof session.subscription === "string" ? session.subscription : null;
-        const metadataPlan = (session.metadata?.plan as AppPlan | undefined) ?? "free";
+        if (session.mode === "subscription" && session.subscription) {
+          const subscriptionId =
+            typeof session.subscription === "string"
+              ? session.subscription
+              : session.subscription.id;
 
-        if (!clerkUserId) {
-          console.warn("Missing clerk_user_id in checkout session metadata");
-          break;
+          const subscription =
+            await stripe.subscriptions.retrieve(subscriptionId);
+
+          await handleSubscriptionUpsert(subscription);
         }
-
-        let stripePriceId: string | null = null;
-        let currentPeriodEnd: string | null = null;
-        let cancelAtPeriodEnd = false;
-        let status: AppStatus = "active";
-
-        if (stripeSubscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(
-            stripeSubscriptionId
-          );
-
-          stripePriceId = subscription.items.data[0]?.price?.id ?? null;
-          status = subscription.status as AppStatus;
-          cancelAtPeriodEnd = subscription.cancel_at_period_end ?? false;
-
-          const periodEnd = (subscription as Stripe.Subscription & {
-            current_period_end?: number;
-          }).current_period_end;
-
-          if (periodEnd) {
-            currentPeriodEnd = new Date(periodEnd * 1000).toISOString();
-          }
-        }
-
-        await upsertSubscriptionRecord({
-          clerkUserId,
-          stripeCustomerId,
-          stripeSubscriptionId,
-          stripePriceId,
-          plan: stripePriceId ? getPlanFromPriceId(stripePriceId) : metadataPlan,
-          status,
-          cancelAtPeriodEnd,
-          currentPeriodEnd,
-        });
 
         break;
       }
@@ -181,43 +203,7 @@ export async function POST(req: Request) {
       case "customer.subscription.created":
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
-
-        const stripeCustomerId =
-          typeof subscription.customer === "string" ? subscription.customer : null;
-
-        let clerkUserId = subscription.metadata?.clerk_user_id ?? null;
-
-        if (!clerkUserId) {
-          clerkUserId = await getClerkUserIdFromCustomer(stripeCustomerId);
-        }
-
-        if (!clerkUserId) {
-          console.warn("Could not resolve clerk_user_id for subscription event");
-          break;
-        }
-
-        const stripePriceId = subscription.items.data[0]?.price?.id ?? null;
-        const plan = getPlanFromPriceId(stripePriceId);
-
-        const periodEnd = (subscription as Stripe.Subscription & {
-          current_period_end?: number;
-        }).current_period_end;
-
-        const currentPeriodEnd = periodEnd
-          ? new Date(periodEnd * 1000).toISOString()
-          : null;
-
-        await upsertSubscriptionRecord({
-          clerkUserId,
-          stripeCustomerId,
-          stripeSubscriptionId: subscription.id,
-          stripePriceId,
-          plan,
-          status: subscription.status as AppStatus,
-          cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
-          currentPeriodEnd,
-        });
-
+        await handleSubscriptionUpsert(subscription);
         break;
       }
 
