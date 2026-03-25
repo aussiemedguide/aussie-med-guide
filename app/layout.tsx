@@ -91,10 +91,7 @@ export default function RootLayout({
       <html lang="en">
         <body className={jakarta.className}>
           <PostHogProvider>{children}</PostHogProvider>
-
-          {process.env.NEXT_PUBLIC_GA_ID ? (
-            <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />
-          ) : null}
+          <GoogleAnalytics gaId="G-WTQDQGY7EY" />
         </body>
       </html>
     </ClerkProvider>
