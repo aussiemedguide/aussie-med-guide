@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 declare global {
   interface Window {
@@ -11,21 +11,18 @@ declare global {
 
 export default function GaPageView() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     if (typeof window.gtag !== "function") return;
-
-    const query = searchParams?.toString();
-    const url = query ? `${pathname}?${query}` : pathname;
 
     window.gtag("event", "page_view", {
       page_title: document.title,
-      page_path: url,
+      page_path: pathname,
       page_location: window.location.href,
       send_to: "G-WTQDQGY7EY",
     });
-  }, [pathname, searchParams]);
+  }, [pathname]);
 
   return null;
 }
