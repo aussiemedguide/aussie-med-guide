@@ -7,9 +7,7 @@ type RequireAuthOptions = {
 };
 
 export async function requireAuth(options: RequireAuthOptions = {}) {
-  const signInRedirect =
-    options.signInRedirect ?? "/sign-in?redirect_url=/tools/command";
-
+  const signInRedirect = options.signInRedirect ?? "/sign-in";
   const { userId } = await auth();
 
   if (!userId) {
