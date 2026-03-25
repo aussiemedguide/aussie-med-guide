@@ -21,7 +21,14 @@ type StudentStatus = "metropolitan" | "rural" | "international";
 type InterviewBand = "weak" | "average" | "strong" | "exceptional";
 type BondedOpenness = "avoid" | "open" | "prefer";
 type RiskTolerance = 0 | 1 | 2 | 3 | 4;
-type FactorKey = "atar" | "ucat" | "interview" | "rural" | "mission" | "bonded" | "portfolio";
+type FactorKey =
+  | "atar"
+  | "ucat"
+  | "interview"
+  | "rural"
+  | "mission"
+  | "bonded"
+  | "portfolio";
 type BandKey = "strong" | "competitive" | "possible" | "unlikely";
 type TacSystem = "UAC" | "QTAC" | "VTAC" | "TISC" | "SATAC" | "Direct";
 type UniKey =
@@ -128,6 +135,10 @@ type StrategyMeta = {
   averageScore: number;
 };
 
+const UCAT_MIN = 900;
+const UCAT_MAX = 2700;
+const UCAT_DEFAULT = 2200;
+
 const TAB_ORDER: { key: TabKey; label: string; icon: typeof Compass }[] = [
   { key: "bonded", label: "Bonded", icon: HeartHandshake },
   { key: "preference", label: "Preference", icon: Target },
@@ -187,10 +198,19 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     hasInterview: true,
     missionHeavy: false,
     portfolioHeavy: true,
-    weights: { atar: 0.22, ucat: 0, interview: 0.54, rural: 0, mission: 0.08, bonded: 0, portfolio: 0.16 },
+    weights: {
+      atar: 0.22,
+      ucat: 0,
+      interview: 0.54,
+      rural: 0,
+      mission: 0.08,
+      bonded: 0,
+      portfolio: 0.16,
+    },
     baseline: { atar: 97.2, ucat: 0, interview: 0.72 },
     floors: { atar: 92 },
-    notes: "Bond is best treated as interview + overall fit heavy rather than UCAT driven.",
+    notes:
+      "Bond is best treated as interview + overall fit heavy rather than UCAT driven.",
   },
   {
     key: "jcu",
@@ -202,11 +222,20 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     hasInterview: true,
     missionHeavy: true,
     ruralFriendly: true,
-    weights: { atar: 0.36, ucat: 0, interview: 0.36, rural: 0.14, mission: 0.14, bonded: 0, portfolio: 0 },
+    weights: {
+      atar: 0.36,
+      ucat: 0,
+      interview: 0.36,
+      rural: 0.14,
+      mission: 0.14,
+      bonded: 0,
+      portfolio: 0,
+    },
     baseline: { atar: 97.1, ucat: 0, interview: 0.68 },
     floors: { atar: 94 },
     ruralBoost: { atar: 1.4, interview: 0.05 },
-    notes: "JCU is modelled as mission aligned and rural sensitive, with no UCAT input.",
+    notes:
+      "JCU is modelled as mission aligned and rural sensitive, with no UCAT input.",
   },
   {
     key: "griffith",
@@ -217,11 +246,20 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     usesUcat: false,
     hasInterview: false,
     directEntryLike: true,
-    weights: { atar: 0.82, ucat: 0, interview: 0, rural: 0.08, mission: 0.1, bonded: 0, portfolio: 0 },
+    weights: {
+      atar: 0.82,
+      ucat: 0,
+      interview: 0,
+      rural: 0.08,
+      mission: 0.1,
+      bonded: 0,
+      portfolio: 0,
+    },
     baseline: { atar: 99.88, ucat: 0, interview: 0 },
     floors: { atar: 99.0 },
     ruralBoost: { atar: 0.45 },
-    notes: "Griffith is treated as an academic gatekeeper pathway with very high ATAR pressure.",
+    notes:
+      "Griffith is treated as an academic gatekeeper pathway with very high ATAR pressure.",
   },
   {
     key: "monash",
@@ -234,12 +272,21 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     directEntryLike: true,
     bondedFriendly: true,
     ruralFriendly: true,
-    weights: { atar: 0.34, ucat: 0.4, interview: 0.22, rural: 0.02, mission: 0.02, bonded: 0, portfolio: 0 },
-    baseline: { atar: 99.15, ucat: 3120, interview: 0.7 },
-    floors: { atar: 95.0, ucat: 2500 },
-    ruralBoost: { atar: 1.0, ucat: 160 },
-    bondedBoost: { atar: 0.2, ucat: 30 },
-    notes: "Monash remains heavily academic and UCAT selective, with pathway sensitivity for rural applicants.",
+    weights: {
+      atar: 0.34,
+      ucat: 0.4,
+      interview: 0.22,
+      rural: 0.02,
+      mission: 0.02,
+      bonded: 0,
+      portfolio: 0,
+    },
+    baseline: { atar: 99.15, ucat: 2460, interview: 0.7 },
+    floors: { atar: 95.0, ucat: 2100 },
+    ruralBoost: { atar: 1.0, ucat: 80 },
+    bondedBoost: { atar: 0.2, ucat: 20 },
+    notes:
+      "Monash remains heavily academic and UCAT selective, with pathway sensitivity for rural applicants.",
   },
   {
     key: "unsw",
@@ -250,11 +297,20 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     usesUcat: true,
     hasInterview: true,
     directEntryLike: true,
-    weights: { atar: 0.32, ucat: 0.34, interview: 0.3, rural: 0.02, mission: 0.02, bonded: 0, portfolio: 0 },
-    baseline: { atar: 99.45, ucat: 3080, interview: 0.71 },
-    floors: { atar: 96.0, ucat: 2550 },
-    ruralBoost: { atar: 0.6, ucat: 110 },
-    notes: "UNSW is best modelled as balanced across academics, UCAT and interview once threshold-competitive.",
+    weights: {
+      atar: 0.32,
+      ucat: 0.34,
+      interview: 0.3,
+      rural: 0.02,
+      mission: 0.02,
+      bonded: 0,
+      portfolio: 0,
+    },
+    baseline: { atar: 99.45, ucat: 2420, interview: 0.71 },
+    floors: { atar: 96.0, ucat: 2140 },
+    ruralBoost: { atar: 0.6, ucat: 60 },
+    notes:
+      "UNSW is best modelled as balanced across academics, UCAT and interview once threshold-competitive.",
   },
   {
     key: "uq",
@@ -265,11 +321,20 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     usesUcat: true,
     hasInterview: true,
     directEntryLike: true,
-    weights: { atar: 0.34, ucat: 0.34, interview: 0.3, rural: 0.02, mission: 0, bonded: 0, portfolio: 0 },
-    baseline: { atar: 99.2, ucat: 3110, interview: 0.72 },
-    floors: { atar: 95.0, ucat: 2670 },
-    ruralBoost: { atar: 0.9, ucat: 180 },
-    notes: "UQ is modelled as balanced, but with a very demanding UCAT baseline for standard provisional applicants.",
+    weights: {
+      atar: 0.34,
+      ucat: 0.34,
+      interview: 0.3,
+      rural: 0.02,
+      mission: 0,
+      bonded: 0,
+      portfolio: 0,
+    },
+    baseline: { atar: 99.2, ucat: 2470, interview: 0.72 },
+    floors: { atar: 95.0, ucat: 2200 },
+    ruralBoost: { atar: 0.9, ucat: 90 },
+    notes:
+      "UQ is modelled as balanced, but with a very demanding UCAT baseline for standard provisional applicants.",
   },
   {
     key: "newcastle_une",
@@ -281,11 +346,20 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     hasInterview: true,
     missionHeavy: true,
     ruralFriendly: true,
-    weights: { atar: 0.1, ucat: 0.5, interview: 0.28, rural: 0.06, mission: 0.06, bonded: 0, portfolio: 0 },
-    baseline: { atar: 94.5, ucat: 2510, interview: 0.7 },
-    floors: { atar: 94.0, ucat: 2400 },
-    ruralBoost: { ucat: 180, interview: 0.04 },
-    notes: "Newcastle / UNE is modelled as UCAT-centric early, then interview decisive later.",
+    weights: {
+      atar: 0.1,
+      ucat: 0.5,
+      interview: 0.28,
+      rural: 0.06,
+      mission: 0.06,
+      bonded: 0,
+      portfolio: 0,
+    },
+    baseline: { atar: 94.5, ucat: 2290, interview: 0.7 },
+    floors: { atar: 94.0, ucat: 2100 },
+    ruralBoost: { ucat: 90, interview: 0.04 },
+    notes:
+      "Newcastle / UNE is modelled as UCAT-centric early, then interview decisive later.",
   },
   {
     key: "western_sydney",
@@ -298,12 +372,21 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     missionHeavy: true,
     ruralFriendly: true,
     bondedFriendly: true,
-    weights: { atar: 0.18, ucat: 0.36, interview: 0.28, rural: 0.08, mission: 0.1, bonded: 0, portfolio: 0 },
-    baseline: { atar: 95.0, ucat: 2900, interview: 0.7 },
-    floors: { atar: 93.5, ucat: 2400 },
-    ruralBoost: { atar: 0.8, ucat: 130 },
-    bondedBoost: { atar: 0.3, ucat: 40 },
-    notes: "WSU is treated as more pathway-sensitive than pure prestige-score models.",
+    weights: {
+      atar: 0.18,
+      ucat: 0.36,
+      interview: 0.28,
+      rural: 0.08,
+      mission: 0.1,
+      bonded: 0,
+      portfolio: 0,
+    },
+    baseline: { atar: 95.0, ucat: 2360, interview: 0.7 },
+    floors: { atar: 93.5, ucat: 2050 },
+    ruralBoost: { atar: 0.8, ucat: 60 },
+    bondedBoost: { atar: 0.3, ucat: 20 },
+    notes:
+      "WSU is treated as more pathway-sensitive than pure prestige-score models.",
   },
   {
     key: "csu_wsu",
@@ -316,12 +399,21 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     missionHeavy: true,
     ruralFriendly: true,
     bondedFriendly: true,
-    weights: { atar: 0.16, ucat: 0.28, interview: 0.26, rural: 0.16, mission: 0.14, bonded: 0, portfolio: 0 },
-    baseline: { atar: 94.0, ucat: 2550, interview: 0.67 },
-    floors: { atar: 91.5, ucat: 2300 },
-    ruralBoost: { atar: 1.2, ucat: 180, interview: 0.04 },
-    bondedBoost: { atar: 0.5, ucat: 60, interview: 0.02 },
-    notes: "This model deliberately rewards rural fit and openness to workforce-targeted pathways.",
+    weights: {
+      atar: 0.16,
+      ucat: 0.28,
+      interview: 0.26,
+      rural: 0.16,
+      mission: 0.14,
+      bonded: 0,
+      portfolio: 0,
+    },
+    baseline: { atar: 94.0, ucat: 2240, interview: 0.67 },
+    floors: { atar: 91.5, ucat: 1980 },
+    ruralBoost: { atar: 1.2, ucat: 100, interview: 0.04 },
+    bondedBoost: { atar: 0.5, ucat: 30, interview: 0.02 },
+    notes:
+      "This model deliberately rewards rural fit and openness to workforce-targeted pathways.",
   },
   {
     key: "wollongong",
@@ -333,11 +425,20 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     hasInterview: true,
     missionHeavy: true,
     portfolioHeavy: true,
-    weights: { atar: 0.14, ucat: 0.22, interview: 0.28, rural: 0.1, mission: 0.12, bonded: 0, portfolio: 0.14 },
-    baseline: { atar: 94.0, ucat: 2850, interview: 0.72 },
-    floors: { atar: 91.0, ucat: 2400 },
-    ruralBoost: { atar: 1.0, ucat: 100, interview: 0.03 },
-    notes: "Wollongong is treated as a fit and context-sensitive pathway rather than a raw-score race.",
+    weights: {
+      atar: 0.14,
+      ucat: 0.22,
+      interview: 0.28,
+      rural: 0.1,
+      mission: 0.12,
+      bonded: 0,
+      portfolio: 0.14,
+    },
+    baseline: { atar: 94.0, ucat: 2320, interview: 0.72 },
+    floors: { atar: 91.0, ucat: 2050 },
+    ruralBoost: { atar: 1.0, ucat: 50, interview: 0.03 },
+    notes:
+      "Wollongong is treated as a fit and context-sensitive pathway rather than a raw-score race.",
   },
   {
     key: "macquarie",
@@ -347,12 +448,22 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     state: "NSW",
     usesUcat: true,
     hasInterview: true,
-    weights: { atar: 0.33, ucat: 0.33, interview: 0.34, rural: 0, mission: 0, bonded: 0, portfolio: 0 },
-    baseline: { atar: 98.2, ucat: 2920, interview: 0.71 },
-    floors: { atar: 95.0, ucat: 2450 },
-    notes: "Macquarie is modelled as one of the cleaner balanced-score programs.",
+    weights: {
+      atar: 0.33,
+      ucat: 0.33,
+      interview: 0.34,
+      rural: 0,
+      mission: 0,
+      bonded: 0,
+      portfolio: 0,
+    },
+    baseline: { atar: 98.2, ucat: 2380, interview: 0.71 },
+    floors: { atar: 95.0, ucat: 2100 },
+    notes:
+      "Macquarie is modelled as one of the cleaner balanced-score programs.",
   },
-  {
+
+   {
     key: "deakin",
     name: "Deakin University",
     tac: "VTAC",
@@ -363,11 +474,20 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     missionHeavy: true,
     ruralFriendly: true,
     bondedFriendly: true,
-    weights: { atar: 0.28, ucat: 0.32, interview: 0.28, rural: 0.06, mission: 0.06, bonded: 0, portfolio: 0 },
-    baseline: { atar: 97.7, ucat: 2850, interview: 0.7 },
-    floors: { atar: 94.0, ucat: 2400 },
-    ruralBoost: { atar: 0.8, ucat: 100 },
-    notes: "Useful as a planning proxy even though actual graduate-style criteria are more nuanced than school-leaver direct entry models.",
+    weights: {
+      atar: 0.28,
+      ucat: 0.32,
+      interview: 0.28,
+      rural: 0.06,
+      mission: 0.06,
+      bonded: 0,
+      portfolio: 0,
+    },
+    baseline: { atar: 97.7, ucat: 2320, interview: 0.7 },
+    floors: { atar: 94.0, ucat: 2050 },
+    ruralBoost: { atar: 0.8, ucat: 60 },
+    notes:
+      "Useful as a planning proxy even though actual graduate-style criteria are more nuanced than school-leaver direct entry models.",
   },
   {
     key: "uwa",
@@ -377,11 +497,20 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     state: "WA",
     usesUcat: true,
     hasInterview: true,
-    weights: { atar: 0.34, ucat: 0.33, interview: 0.33, rural: 0, mission: 0, bonded: 0, portfolio: 0 },
-    baseline: { atar: 98.8, ucat: 2870, interview: 0.7 },
-    floors: { atar: 95.0, ucat: 2400 },
-    ruralBoost: { atar: 0.5, ucat: 80 },
-    notes: "UWA is modelled as a traditional high-achieving balanced pathway.",
+    weights: {
+      atar: 0.34,
+      ucat: 0.33,
+      interview: 0.33,
+      rural: 0,
+      mission: 0,
+      bonded: 0,
+      portfolio: 0,
+    },
+    baseline: { atar: 98.8, ucat: 2330, interview: 0.7 },
+    floors: { atar: 95.0, ucat: 2050 },
+    ruralBoost: { atar: 0.5, ucat: 40 },
+    notes:
+      "UWA is modelled as a traditional high-achieving balanced pathway.",
   },
   {
     key: "curtin",
@@ -394,11 +523,20 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     directEntryLike: true,
     ruralFriendly: true,
     bondedFriendly: true,
-    weights: { atar: 0.36, ucat: 0.36, interview: 0.24, rural: 0.04, mission: 0, bonded: 0, portfolio: 0 },
-    baseline: { atar: 97.2, ucat: 2800, interview: 0.69 },
-    floors: { atar: 95.0, ucat: 2350 },
-    ruralBoost: { atar: 0.7, ucat: 100 },
-    notes: "Curtin is treated as a more classical academic + UCAT gatekeeper model.",
+    weights: {
+      atar: 0.36,
+      ucat: 0.36,
+      interview: 0.24,
+      rural: 0.04,
+      mission: 0,
+      bonded: 0,
+      portfolio: 0,
+    },
+    baseline: { atar: 97.2, ucat: 2300, interview: 0.69 },
+    floors: { atar: 95.0, ucat: 2000 },
+    ruralBoost: { atar: 0.7, ucat: 50 },
+    notes:
+      "Curtin is treated as a more classical academic + UCAT gatekeeper model.",
   },
   {
     key: "adelaide",
@@ -409,11 +547,20 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     usesUcat: true,
     hasInterview: true,
     directEntryLike: true,
-    weights: { atar: 0.33, ucat: 0.33, interview: 0.34, rural: 0, mission: 0, bonded: 0, portfolio: 0 },
-    baseline: { atar: 99.0, ucat: 2940, interview: 0.72 },
-    floors: { atar: 95.0, ucat: 2400 },
-    ruralBoost: { atar: 0.5, ucat: 90 },
-    notes: "Adelaide is modelled as a balanced but still very demanding program for standard applicants.",
+    weights: {
+      atar: 0.33,
+      ucat: 0.33,
+      interview: 0.34,
+      rural: 0,
+      mission: 0,
+      bonded: 0,
+      portfolio: 0,
+    },
+    baseline: { atar: 99.0, ucat: 2360, interview: 0.72 },
+    floors: { atar: 95.0, ucat: 2050 },
+    ruralBoost: { atar: 0.5, ucat: 50 },
+    notes:
+      "Adelaide is modelled as a balanced but still very demanding program for standard applicants.",
   },
   {
     key: "utas",
@@ -425,11 +572,20 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     hasInterview: true,
     missionHeavy: true,
     ruralFriendly: true,
-    weights: { atar: 0.28, ucat: 0.26, interview: 0.26, rural: 0.1, mission: 0.1, bonded: 0, portfolio: 0 },
-    baseline: { atar: 95.5, ucat: 2550, interview: 0.68 },
-    floors: { atar: 92.0, ucat: 2300 },
-    ruralBoost: { atar: 1.0, ucat: 120 },
-    notes: "Tasmania is treated as more accessible than the pure top-score metropolitan options.",
+    weights: {
+      atar: 0.28,
+      ucat: 0.26,
+      interview: 0.26,
+      rural: 0.1,
+      mission: 0.1,
+      bonded: 0,
+      portfolio: 0,
+    },
+    baseline: { atar: 95.5, ucat: 2240, interview: 0.68 },
+    floors: { atar: 92.0, ucat: 1980 },
+    ruralBoost: { atar: 1.0, ucat: 70 },
+    notes:
+      "Tasmania is treated as more accessible than the pure top-score metropolitan options.",
   },
   {
     key: "anu",
@@ -439,10 +595,19 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     state: "ACT",
     usesUcat: true,
     hasInterview: true,
-    weights: { atar: 0.33, ucat: 0.33, interview: 0.34, rural: 0, mission: 0, bonded: 0, portfolio: 0 },
-    baseline: { atar: 99.0, ucat: 2850, interview: 0.71 },
-    floors: { atar: 95.0, ucat: 2400 },
-    notes: "ANU is kept in the model as a strong academic target rather than a low-threshold option.",
+    weights: {
+      atar: 0.33,
+      ucat: 0.33,
+      interview: 0.34,
+      rural: 0,
+      mission: 0,
+      bonded: 0,
+      portfolio: 0,
+    },
+    baseline: { atar: 99.0, ucat: 2320, interview: 0.71 },
+    floors: { atar: 95.0, ucat: 2050 },
+    notes:
+      "ANU is kept in the model as a strong academic target rather than a low-threshold option.",
   },
   {
     key: "notre_dame",
@@ -454,11 +619,20 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     hasInterview: true,
     missionHeavy: true,
     portfolioHeavy: true,
-    weights: { atar: 0.18, ucat: 0.24, interview: 0.28, rural: 0.08, mission: 0.1, bonded: 0, portfolio: 0.12 },
-    baseline: { atar: 94.5, ucat: 2550, interview: 0.71 },
-    floors: { atar: 90.0, ucat: 2300 },
-    ruralBoost: { atar: 0.8, ucat: 120, interview: 0.03 },
-    notes: "Notre Dame is better evaluated through fit and interview potential than raw percentile chasing.",
+    weights: {
+      atar: 0.18,
+      ucat: 0.24,
+      interview: 0.28,
+      rural: 0.08,
+      mission: 0.1,
+      bonded: 0,
+      portfolio: 0.12,
+    },
+    baseline: { atar: 94.5, ucat: 2230, interview: 0.71 },
+    floors: { atar: 90.0, ucat: 1980 },
+    ruralBoost: { atar: 0.8, ucat: 70, interview: 0.03 },
+    notes:
+      "Notre Dame is better evaluated through fit and interview potential than raw percentile chasing.",
   },
   {
     key: "cdu",
@@ -471,12 +645,21 @@ const UNIVERSITY_RULES: UniversityRule[] = [
     missionHeavy: true,
     ruralFriendly: true,
     bondedFriendly: true,
-    weights: { atar: 0.16, ucat: 0.24, interview: 0.24, rural: 0.18, mission: 0.18, bonded: 0, portfolio: 0 },
-    baseline: { atar: 91.0, ucat: 2350, interview: 0.66 },
-    floors: { atar: 85.0, ucat: 2100 },
-    ruralBoost: { atar: 1.3, ucat: 180, interview: 0.05 },
-    bondedBoost: { atar: 0.5, ucat: 60, interview: 0.02 },
-    notes: "CDU is intentionally path-sensitive and should not be compared like a metro prestige race.",
+    weights: {
+      atar: 0.16,
+      ucat: 0.24,
+      interview: 0.24,
+      rural: 0.18,
+      mission: 0.18,
+      bonded: 0,
+      portfolio: 0,
+    },
+    baseline: { atar: 91.0, ucat: 2030, interview: 0.66 },
+    floors: { atar: 85.0, ucat: 1850 },
+    ruralBoost: { atar: 1.3, ucat: 100, interview: 0.05 },
+    bondedBoost: { atar: 0.5, ucat: 30, interview: 0.02 },
+    notes:
+      "CDU is intentionally path-sensitive and should not be compared like a metro prestige race.",
   },
 ];
 
@@ -488,11 +671,20 @@ const PREFERENCE_GOAL_LABEL: Record<PreferenceGoal, string> = {
 
 const PREFERENCE_GOAL_COPY: Record<PreferenceGoal, string> = {
   safe: "Maximises probability of receiving an offer within this TAC.",
-  normal: "Best overall mix of reach, realism, and backup options within this TAC.",
-  aggressive: "Higher upside ordering within this TAC, with more ambitious reaches near the top.",
+  normal:
+    "Best overall mix of reach, realism, and backup options within this TAC.",
+  aggressive:
+    "Higher upside ordering within this TAC, with more ambitious reaches near the top.",
 };
 
-const TAC_OPTIONS: TacSystem[] = ["QTAC", "UAC", "VTAC", "TISC", "SATAC", "Direct"];
+const TAC_OPTIONS: TacSystem[] = [
+  "QTAC",
+  "UAC",
+  "VTAC",
+  "TISC",
+  "SATAC",
+  "Direct",
+];
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -503,7 +695,7 @@ function normaliseATAR(atar: number) {
 }
 
 function normaliseUCAT(ucat: number) {
-  return clamp((ucat - 2100) / 1100, 0, 1);
+  return clamp((ucat - UCAT_MIN) / (UCAT_MAX - UCAT_MIN), 0, 1);
 }
 
 function deriveInterviewNumeric(interview: InterviewBand) {
@@ -516,7 +708,13 @@ function safeRound(value: number, dp = 1) {
 }
 
 function bandOrder(band: BandKey) {
-  return band === "strong" ? 3 : band === "competitive" ? 2 : band === "possible" ? 1 : 0;
+  return band === "strong"
+    ? 3
+    : band === "competitive"
+      ? 2
+      : band === "possible"
+        ? 1
+        : 0;
 }
 
 function bandLabel(band: BandKey) {
@@ -542,19 +740,19 @@ function getEffectiveBaseline(rule: UniversityRule, profile: Profile) {
 
   if (profile.status === "international") {
     atar -= (rule.ruralBoost?.atar ?? 0.8) + 0.8;
-    ucat -= (rule.ruralBoost?.ucat ?? 100) + 90;
+    ucat -= (rule.ruralBoost?.ucat ?? 60) + 50;
     interview -= (rule.ruralBoost?.interview ?? 0.03) + 0.03;
   }
 
   if (profile.bonded !== "avoid" && rule.bondedFriendly) {
     atar -= rule.bondedBoost?.atar ?? 0.25;
-    ucat -= rule.bondedBoost?.ucat ?? 40;
+    ucat -= rule.bondedBoost?.ucat ?? 20;
     interview -= rule.bondedBoost?.interview ?? 0.01;
   }
 
   return {
     atar: clamp(atar, 80, 99.95),
-    ucat: clamp(ucat, 0, 3600),
+    ucat: clamp(ucat, 0, UCAT_MAX),
     interview: clamp(interview, 0.3, 0.95),
   };
 }
@@ -569,7 +767,10 @@ function getPortfolioFit(rule: UniversityRule, profile: Profile) {
   return clamp(fit, 0.4, 0.9);
 }
 
-function evaluateUniversity(rule: UniversityRule, profile: Profile): EvaluatedUniversity {
+function evaluateUniversity(
+  rule: UniversityRule,
+  profile: Profile
+): EvaluatedUniversity {
   const effective = getEffectiveBaseline(rule, profile);
   const interviewValue = deriveInterviewNumeric(profile.interview);
   const portfolioFit = getPortfolioFit(rule, profile);
@@ -583,18 +784,28 @@ function evaluateUniversity(rule: UniversityRule, profile: Profile): EvaluatedUn
   const targetInterview = rule.hasInterview ? effective.interview : 0;
 
   const factorScores = {
-    atar: rule.weights.atar > 0 ? clamp(0.5 + (userATAR - targetATAR) * 2.4, 0, 1) : 0,
-    ucat: rule.weights.ucat > 0 ? clamp(0.5 + (userUCAT - targetUCAT) * 2.2, 0, 1) : 0,
-    interview: rule.weights.interview > 0 ? clamp(0.5 + (userInterview - targetInterview) * 2.3, 0, 1) : 0,
+    atar:
+      rule.weights.atar > 0
+        ? clamp(0.5 + (userATAR - targetATAR) * 2.4, 0, 1)
+        : 0,
+    ucat:
+      rule.weights.ucat > 0
+        ? clamp(0.5 + (userUCAT - targetUCAT) * 2.2, 0, 1)
+        : 0,
+    interview:
+      rule.weights.interview > 0
+        ? clamp(0.5 + (userInterview - targetInterview) * 2.3, 0, 1)
+        : 0,
     rural: rule.weights.rural > 0 ? (profile.status === "metropolitan" ? 0.45 : 0.82) : 0,
     mission: rule.weights.mission > 0 ? (profile.status === "metropolitan" ? 0.52 : 0.78) : 0,
-    bonded: rule.weights.bonded > 0
-      ? profile.bonded === "avoid"
-        ? 0.35
-        : profile.bonded === "open"
-          ? 0.65
-          : 0.82
-      : 0,
+    bonded:
+      rule.weights.bonded > 0
+        ? profile.bonded === "avoid"
+          ? 0.35
+          : profile.bonded === "open"
+            ? 0.65
+            : 0.82
+        : 0,
     portfolio: rule.weights.portfolio > 0 ? portfolioFit : 0,
   };
 
@@ -625,13 +836,17 @@ function evaluateUniversity(rule: UniversityRule, profile: Profile): EvaluatedUn
 
   const factors = [
     { key: "ATAR", value: gap.atar, enabled: rule.weights.atar > 0 },
-    { key: "UCAT", value: gap.ucat / 500, enabled: rule.weights.ucat > 0 },
+    { key: "UCAT", value: gap.ucat / 300, enabled: rule.weights.ucat > 0 },
     { key: "Interview", value: gap.interview * 2.2, enabled: rule.weights.interview > 0 },
   ].filter((item) => item.enabled);
 
   factors.sort((a, b) => b.value - a.value);
   const limitingFactor =
-    factors[0]?.value > 0 ? factors[0].key : rule.missionHeavy ? "Mission fit" : "No major red flag";
+    factors[0]?.value > 0
+      ? factors[0].key
+      : rule.missionHeavy
+        ? "Mission fit"
+        : "No major red flag";
 
   let band: BandKey = "unlikely";
   if (score >= 0.76) band = "strong";
@@ -649,24 +864,51 @@ function evaluateUniversity(rule: UniversityRule, profile: Profile): EvaluatedUn
   const leverage: string[] = [];
 
   if (rule.weights.atar > 0) {
-    if (gap.atar <= 0) reasons.push("ATAR is at or above this model's effective planning line.");
-    else leverage.push(`Improve ATAR by about ${safeRound(Math.max(0.05, gap.atar), 2)} to materially strengthen this target.`);
+    if (gap.atar <= 0) {
+      reasons.push("ATAR is at or above this model's effective planning line.");
+    } else {
+      leverage.push(
+        `Improve ATAR by about ${safeRound(
+          Math.max(0.05, gap.atar),
+          2
+        )} to materially strengthen this target.`
+      );
+    }
   }
 
   if (rule.usesUcat) {
-    if (gap.ucat <= 0) reasons.push("UCAT sits in or above the useful range for this pathway.");
-    else leverage.push(`A UCAT lift of roughly ${Math.max(10, gap.ucat)} would move this profile more clearly into range.`);
+    if (gap.ucat <= 0) {
+      reasons.push("UCAT sits in or above the useful range for this pathway.");
+    } else {
+      leverage.push(
+        `A UCAT lift of roughly ${Math.max(
+          10,
+          gap.ucat
+        )} would move this profile more clearly into range.`
+      );
+    }
   }
 
   if (rule.hasInterview) {
-    if (gap.interview <= 0) reasons.push("Current interview band is competitive for this pathway.");
-    else leverage.push("Interview performance is a key swing factor here.");
+    if (gap.interview <= 0) {
+      reasons.push("Current interview band is competitive for this pathway.");
+    } else {
+      leverage.push("Interview performance is a key swing factor here.");
+    }
   }
 
-  if (rule.ruralFriendly && profile.status !== "metropolitan") reasons.push("This pathway rewards rural or context-based eligibility.");
-  if (rule.bondedFriendly && profile.bonded !== "avoid") reasons.push("Openness to bonded places improves strategic flexibility here.");
-  if (rule.portfolioHeavy) reasons.push("Raw numbers matter less here than fit, story and interview performance.");
-  if (rule.missionHeavy) reasons.push("Mission alignment matters more here than prestige-chasing.");
+  if (rule.ruralFriendly && profile.status !== "metropolitan") {
+    reasons.push("This pathway rewards rural or context-based eligibility.");
+  }
+  if (rule.bondedFriendly && profile.bonded !== "avoid") {
+    reasons.push("Openness to bonded places improves strategic flexibility here.");
+  }
+  if (rule.portfolioHeavy) {
+    reasons.push("Raw numbers matter less here than fit, story and interview performance.");
+  }
+  if (rule.missionHeavy) {
+    reasons.push("Mission alignment matters more here than prestige-chasing.");
+  }
 
   return {
     ...rule,
@@ -683,19 +925,37 @@ function evaluateUniversity(rule: UniversityRule, profile: Profile): EvaluatedUn
 
 function buildInsightsRun(list: EvaluatedUniversity[]): InsightsRun {
   return {
-    strong: list.filter((u) => u.band === "strong").sort((a, b) => b.score - a.score),
-    competitive: list.filter((u) => u.band === "competitive").sort((a, b) => b.score - a.score),
-    possible: list.filter((u) => u.band === "possible").sort((a, b) => b.score - a.score),
-    unlikely: list.filter((u) => u.band === "unlikely").sort((a, b) => b.score - a.score),
+    strong: list
+      .filter((u) => u.band === "strong")
+      .sort((a, b) => b.score - a.score),
+    competitive: list
+      .filter((u) => u.band === "competitive")
+      .sort((a, b) => b.score - a.score),
+    possible: list
+      .filter((u) => u.band === "possible")
+      .sort((a, b) => b.score - a.score),
+    unlikely: list
+      .filter((u) => u.band === "unlikely")
+      .sort((a, b) => b.score - a.score),
   };
 }
 
-function getTacScopedUniversities(list: EvaluatedUniversity[], selectedTac: TacSystem) {
+function getTacScopedUniversities(
+  list: EvaluatedUniversity[],
+  selectedTac: TacSystem
+) {
   return list.filter((u) => u.tac === selectedTac);
 }
 
 function getPrestigeValue(uni: EvaluatedUniversity) {
-  return uni.baseline.atar + uni.baseline.ucat / 1000 + (uni.directEntryLike ? 0.18 : 0) + (uni.state === "NSW" || uni.state === "QLD" || uni.state === "VIC" ? 0.04 : 0);
+  return (
+    uni.baseline.atar +
+    uni.baseline.ucat / 1000 +
+    (uni.directEntryLike ? 0.18 : 0) +
+    (uni.state === "NSW" || uni.state === "QLD" || uni.state === "VIC"
+      ? 0.04
+      : 0)
+  );
 }
 
 function getSelectionBoost(uni: EvaluatedUniversity, selectedTargets: UniKey[]) {
@@ -710,14 +970,21 @@ function getSafetyPenalty(uni: EvaluatedUniversity) {
 
 function getAggressiveUpside(uni: EvaluatedUniversity) {
   const prestige = getPrestigeValue(uni) / 120;
-  const reachBonus = uni.band === "competitive" ? 0.08 : uni.band === "possible" ? 0.12 : uni.band === "strong" ? 0.02 : -0.14;
+  const reachBonus =
+    uni.band === "competitive"
+      ? 0.08
+      : uni.band === "possible"
+        ? 0.12
+        : uni.band === "strong"
+          ? 0.02
+          : -0.14;
   return prestige + reachBonus;
 }
 
 function rankUniversitiesForGoal(
   list: EvaluatedUniversity[],
   goal: PreferenceGoal,
-  selectedTargets: UniKey[],
+  selectedTargets: UniKey[]
 ) {
   return [...list].sort((a, b) => {
     const aSelectedBoost = getSelectionBoost(a, selectedTargets);
@@ -745,22 +1012,30 @@ function rankUniversitiesForGoal(
       (b.band === "possible" ? 0.01 : -0.18) +
       (b.missionHeavy || b.portfolioHeavy ? 0.01 : 0);
 
-    const aAggressiveValue = a.score * 0.68 + getAggressiveUpside(a) + aSelectedBoost;
-    const bAggressiveValue = b.score * 0.68 + getAggressiveUpside(b) + bSelectedBoost;
+    const aAggressiveValue =
+      a.score * 0.68 + getAggressiveUpside(a) + aSelectedBoost;
+    const bAggressiveValue =
+      b.score * 0.68 + getAggressiveUpside(b) + bSelectedBoost;
 
     if (goal === "safe") {
       if (aSafeValue !== bSafeValue) return bSafeValue - aSafeValue;
-      if (bandOrder(a.band) !== bandOrder(b.band)) return bandOrder(b.band) - bandOrder(a.band);
+      if (bandOrder(a.band) !== bandOrder(b.band)) {
+        return bandOrder(b.band) - bandOrder(a.band);
+      }
       return b.score - a.score;
     }
 
     if (goal === "normal") {
       if (aNormalValue !== bNormalValue) return bNormalValue - aNormalValue;
-      if (bandOrder(a.band) !== bandOrder(b.band)) return bandOrder(b.band) - bandOrder(a.band);
+      if (bandOrder(a.band) !== bandOrder(b.band)) {
+        return bandOrder(b.band) - bandOrder(a.band);
+      }
       return b.score - a.score;
     }
 
-    if (aAggressiveValue !== bAggressiveValue) return bAggressiveValue - aAggressiveValue;
+    if (aAggressiveValue !== bAggressiveValue) {
+      return bAggressiveValue - aAggressiveValue;
+    }
     if (aPrestige !== bPrestige) return bPrestige - aPrestige;
     return b.score - a.score;
   });
@@ -769,7 +1044,7 @@ function rankUniversitiesForGoal(
 function composePreferenceList(
   tacScoped: EvaluatedUniversity[],
   goal: PreferenceGoal,
-  selectedTargets: UniKey[],
+  selectedTargets: UniKey[]
 ) {
   const ranked = rankUniversitiesForGoal(tacScoped, goal, selectedTargets);
 
@@ -815,19 +1090,23 @@ function scorePreferences(
   list: EvaluatedUniversity[],
   selectedTac: TacSystem,
   goal: PreferenceGoal,
-  selectedTargets: UniKey[],
+  selectedTargets: UniKey[]
 ) {
   const tacScoped = getTacScopedUniversities(list, selectedTac);
   return composePreferenceList(tacScoped, goal, selectedTargets);
 }
 
-function getStrategyMeta(items: EvaluatedUniversity[], selectedTargets: UniKey[]): StrategyMeta {
+function getStrategyMeta(
+  items: EvaluatedUniversity[],
+  selectedTargets: UniKey[]
+): StrategyMeta {
   return {
     strong: items.filter((u) => u.band === "strong").length,
     competitive: items.filter((u) => u.band === "competitive").length,
     possible: items.filter((u) => u.band === "possible").length,
     unlikely: items.filter((u) => u.band === "unlikely").length,
-    selectedIncluded: items.filter((u) => selectedTargets.includes(u.key)).length,
+    selectedIncluded: items.filter((u) => selectedTargets.includes(u.key))
+      .length,
     averageScore:
       items.reduce((sum, u) => sum + u.score, 0) / Math.max(1, items.length),
   };
@@ -855,8 +1134,12 @@ function SectionTitle({
         <span>{eyebrow}</span>
       </div>
       <div className="space-y-1">
-        <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">{title}</h1>
-        <p className="max-w-4xl text-sm leading-6 text-slate-600 sm:text-base">{description}</p>
+        <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+          {title}
+        </h1>
+        <p className="max-w-4xl text-sm leading-6 text-slate-600 sm:text-base">
+          {description}
+        </p>
       </div>
     </div>
   );
@@ -906,7 +1189,12 @@ function Pill({
   };
 
   return (
-    <span className={cn("inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold", styles[tone])}>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold",
+        styles[tone]
+      )}
+    >
       {children}
     </span>
   );
@@ -921,8 +1209,12 @@ function CompactMetric({
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{label}</div>
-      <div className="mt-1 text-lg font-black tracking-tight text-slate-950">{value}</div>
+      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </div>
+      <div className="mt-1 text-lg font-black tracking-tight text-slate-950">
+        {value}
+      </div>
     </div>
   );
 }
@@ -962,8 +1254,12 @@ function MetricCard({
 }) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</div>
-      <div className="mt-2 text-2xl font-black tracking-tight text-slate-950">{value}</div>
+      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-black tracking-tight text-slate-950">
+        {value}
+      </div>
       <div className="mt-1 text-sm text-slate-500">{hint}</div>
     </div>
   );
@@ -981,43 +1277,75 @@ function UniversityInsightCard({ uni }: { uni: EvaluatedUniversity }) {
           </div>
           <p className="mt-2 text-sm text-slate-600">{uni.pathway}</p>
         </div>
-        <span className={cn("inline-flex rounded-full px-3 py-1 text-xs font-bold", TAG_STYLES[uni.band])}>
+        <span
+          className={cn(
+            "inline-flex rounded-full px-3 py-1 text-xs font-bold",
+            TAG_STYLES[uni.band]
+          )}
+        >
           {bandLabel(uni.band)}
         </span>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         <div className="rounded-2xl bg-white/70 p-3">
-          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Effective planning line</div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+            Effective planning line
+          </div>
           <div className="mt-2 text-sm text-slate-700">
             ATAR {safeRound(uni.effectiveCutoffs.atar, 2)}
-            {uni.usesUcat ? ` · UCAT ${Math.round(uni.effectiveCutoffs.ucat)}` : " · No UCAT weighting"}
-            {uni.hasInterview ? ` · Interview ${Math.round(uni.effectiveCutoffs.interview * 100)}%` : ""}
+            {uni.usesUcat
+              ? ` · UCAT ${Math.round(uni.effectiveCutoffs.ucat)}`
+              : " · No UCAT weighting"}
+            {uni.hasInterview
+              ? ` · Interview ${Math.round(uni.effectiveCutoffs.interview * 100)}%`
+              : ""}
           </div>
         </div>
         <div className="rounded-2xl bg-white/70 p-3">
-          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Limiting factor</div>
-          <div className="mt-2 text-sm font-semibold text-slate-900">{uni.limitingFactor}</div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+            Limiting factor
+          </div>
+          <div className="mt-2 text-sm font-semibold text-slate-900">
+            {uni.limitingFactor}
+          </div>
         </div>
         <div className="rounded-2xl bg-white/70 p-3">
-          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Confidence</div>
-          <div className="mt-2 text-sm font-semibold text-slate-900">{uni.confidence}</div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+            Confidence
+          </div>
+          <div className="mt-2 text-sm font-semibold text-slate-900">
+            {uni.confidence}
+          </div>
         </div>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-white/70 bg-white/70 p-4">
-          <div className="text-sm font-semibold text-slate-900">Why it landed here</div>
+          <div className="text-sm font-semibold text-slate-900">
+            Why it landed here
+          </div>
           <ul className="mt-2 space-y-2 text-sm text-slate-600">
-            {uni.reasons.length ? uni.reasons.map((reason) => <li key={reason}>• {reason}</li>) : <li>• This sits close to the current planning line.</li>}
+            {uni.reasons.length ? (
+              uni.reasons.map((reason) => <li key={reason}>• {reason}</li>)
+            ) : (
+              <li>• This sits close to the current planning line.</li>
+            )}
           </ul>
         </div>
         <div className="rounded-2xl border border-white/70 bg-white/70 p-4">
-          <div className="text-sm font-semibold text-slate-900">Best next moves</div>
+          <div className="text-sm font-semibold text-slate-900">
+            Best next moves
+          </div>
           <ul className="mt-2 space-y-2 text-sm text-slate-600">
-            {uni.leverage.length
-              ? uni.leverage.map((item) => <li key={item}>• {item}</li>)
-              : <li>• Focus on application quality and ordering rather than chasing tiny score changes.</li>}
+            {uni.leverage.length ? (
+              uni.leverage.map((item) => <li key={item}>• {item}</li>)
+            ) : (
+              <li>
+                • Focus on application quality and ordering rather than chasing
+                tiny score changes.
+              </li>
+            )}
           </ul>
         </div>
       </div>
@@ -1042,20 +1370,34 @@ function StrategySummaryStrip({
   return (
     <div className={cn("mt-4 grid grid-cols-2 gap-2 rounded-2xl border p-3 text-sm sm:grid-cols-4", wrapper)}>
       <div>
-        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Strong + Competitive</div>
-        <div className="mt-1 font-black text-slate-950">{meta.strong + meta.competitive}</div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+          Strong + Competitive
+        </div>
+        <div className="mt-1 font-black text-slate-950">
+          {meta.strong + meta.competitive}
+        </div>
       </div>
       <div>
-        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Possible</div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+          Possible
+        </div>
         <div className="mt-1 font-black text-slate-950">{meta.possible}</div>
       </div>
       <div>
-        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Selected Included</div>
-        <div className="mt-1 font-black text-slate-950">{meta.selectedIncluded}</div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+          Selected Included
+        </div>
+        <div className="mt-1 font-black text-slate-950">
+          {meta.selectedIncluded}
+        </div>
       </div>
       <div>
-        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Avg Score</div>
-        <div className="mt-1 font-black text-slate-950">{safeRound(meta.averageScore * 100, 0)}%</div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+          Avg Score
+        </div>
+        <div className="mt-1 font-black text-slate-950">
+          {safeRound(meta.averageScore * 100, 0)}%
+        </div>
       </div>
     </div>
   );
@@ -1123,10 +1465,22 @@ function PreferenceCard({
                     <div className="font-semibold text-slate-950">{uni.name}</div>
                     {isSelected ? <Pill tone="violet">Selected</Pill> : null}
                   </div>
-                  <div className="text-xs text-slate-500">{uni.tac} · {bandLabel(uni.band)}</div>
+                  <div className="text-xs text-slate-500">
+                    {uni.tac} · {bandLabel(uni.band)}
+                  </div>
                 </div>
               </div>
-              <Pill tone={uni.band === "strong" ? "emerald" : uni.band === "competitive" ? "blue" : uni.band === "possible" ? "amber" : "rose"}>
+              <Pill
+                tone={
+                  uni.band === "strong"
+                    ? "emerald"
+                    : uni.band === "competitive"
+                      ? "blue"
+                      : uni.band === "possible"
+                        ? "amber"
+                        : "rose"
+                }
+              >
                 {bandLabel(uni.band)}
               </Pill>
             </div>
@@ -1135,7 +1489,8 @@ function PreferenceCard({
       </div>
 
       <div className={cn("mt-4 rounded-2xl px-4 py-3 text-sm font-medium", footer)}>
-        Strategy: {title === "Aggressive"
+        Strategy:{" "}
+        {title === "Aggressive"
           ? "Pushes higher-upside TAC-specific reaches upward, while still keeping weaker options below viable ones."
           : title === "Normal"
             ? "Best all-round TAC order. Mixes realistic offers with selective upside."
@@ -1305,12 +1660,20 @@ function InterviewPreviewCard({
       onClick={onClick}
       className={cn(
         "rounded-3xl border p-4 text-left shadow-sm transition",
-        active ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white hover:bg-slate-50"
+        active
+          ? "border-emerald-300 bg-emerald-50"
+          : "border-slate-200 bg-white hover:bg-slate-50"
       )}
     >
-      <div className="text-sm font-semibold text-slate-900">{INTERVIEW_LABEL[band]}</div>
-      <div className="mt-3 text-3xl font-black tracking-tight text-slate-950">{count}</div>
-      <div className="mt-1 text-sm text-slate-500">strong + competitive targets</div>
+      <div className="text-sm font-semibold text-slate-900">
+        {INTERVIEW_LABEL[band]}
+      </div>
+      <div className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+        {count}
+      </div>
+      <div className="mt-1 text-sm text-slate-500">
+        strong + competitive targets
+      </div>
     </button>
   );
 }
@@ -1335,7 +1698,9 @@ function InsightsBandSection({
           <h3 className="text-2xl font-black tracking-tight">{title}</h3>
           <p className="mt-1 text-sm text-slate-600">{description}</p>
         </div>
-        <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-bold text-white">{items.length}</span>
+        <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-bold text-white">
+          {items.length}
+        </span>
       </div>
 
       <div className="grid gap-4">
@@ -1351,7 +1716,7 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
   const [tab, setTab] = useState<TabKey>("bonded");
 
   const [atar, setAtar] = useState(99.2);
-  const [ucat, setUcat] = useState(2850);
+  const [ucat, setUcat] = useState(UCAT_DEFAULT);
   const [status, setStatus] = useState<StudentStatus>("metropolitan");
   const [interview, setInterview] = useState<InterviewBand>("average");
   const [bonded, setBonded] = useState<BondedOpenness>("open");
@@ -1388,7 +1753,7 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
   const scenarioProfile: Profile = {
     ...baseProfile,
     atar: clamp(atar + scenarioATARDelta, 80, 99.95),
-    ucat: clamp(ucat + scenarioUCATDelta, 0, 3600),
+    ucat: clamp(ucat + scenarioUCATDelta, 0, UCAT_MAX),
     interview: scenarioInterview,
   };
 
@@ -1430,18 +1795,8 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
 
   const preferenceStrategies = useMemo(() => {
     return {
-      safe: scorePreferences(
-        evaluatedBase,
-        selectedTac,
-        "safe",
-        preferences
-      ),
-      normal: scorePreferences(
-        evaluatedBase,
-        selectedTac,
-        "normal",
-        preferences
-      ),
+      safe: scorePreferences(evaluatedBase, selectedTac, "safe", preferences),
+      normal: scorePreferences(evaluatedBase, selectedTac, "normal", preferences),
       aggressive: scorePreferences(
         evaluatedBase,
         selectedTac,
@@ -1454,7 +1809,9 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
   const interviewSchools = useMemo(() => {
     return evaluatedBase
       .filter((u) => u.hasInterview)
-      .sort((a, b) => b.weights.interview - a.weights.interview || b.score - a.score);
+      .sort(
+        (a, b) => b.weights.interview - a.weights.interview || b.score - a.score
+      );
   }, [evaluatedBase]);
 
   const interviewBandPreview = useMemo(() => {
@@ -1504,7 +1861,7 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
         .reduce((sum, u) => sum + Math.max(0, u.gap.ucat), 0) /
       Math.max(1, evaluatedBase.filter((u) => u.usesUcat).length);
 
-    if (averageUCATGap > 120) {
+    if (averageUCATGap > 70) {
       biggestLevers.push(
         "UCAT improvements would shift more universities than very small ATAR gains."
       );
@@ -1652,7 +2009,7 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                       value={ucat}
                       onChange={setUcat}
                       min={0}
-                      max={3600}
+                      max={UCAT_MAX}
                       step={10}
                     />
 
@@ -1693,15 +2050,7 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                           Risk tolerance
                         </span>
                         <span className="text-sm font-semibold text-violet-700">
-                          {
-                            [
-                              "Safe",
-                              "Measured",
-                              "Balanced",
-                              "Ambitious",
-                              "Aggressive",
-                            ][riskTolerance]
-                          }
+                          {["Safe", "Measured", "Balanced", "Ambitious", "Aggressive"][riskTolerance]}
                         </span>
                       </div>
                       <Slider
@@ -1709,9 +2058,7 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                         min={0}
                         max={4}
                         step={1}
-                        onChange={(value) =>
-                          setRiskTolerance(value as RiskTolerance)
-                        }
+                        onChange={(value) => setRiskTolerance(value as RiskTolerance)}
                       />
                       <div className="flex justify-between text-xs text-slate-500">
                         <span>Safe</span>
@@ -1781,7 +2128,8 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                       setPreferences((current) =>
                         current.filter(
                           (key) =>
-                            UNIVERSITY_RULES.find((u) => u.key === key)?.tac === nextTac
+                            UNIVERSITY_RULES.find((u) => u.key === key)?.tac ===
+                            nextTac
                         )
                       );
                     }}
@@ -1803,7 +2151,9 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                       onToggle={togglePreference}
                     />
                     <p className="mt-2 text-xs text-slate-500">
-                      These act as preference boosts only. The optimiser still ranks all universities inside the selected TAC so the strategy stays realistic.
+                      These act as preference boosts only. The optimiser still
+                      ranks all universities inside the selected TAC so the
+                      strategy stays realistic.
                     </p>
                   </div>
 
@@ -1813,15 +2163,7 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                         Risk tolerance
                       </span>
                       <span className="text-sm font-semibold text-violet-700">
-                        {
-                          [
-                            "Safe",
-                            "Measured",
-                            "Balanced",
-                            "Ambitious",
-                            "Aggressive",
-                          ][riskTolerance]
-                        }
+                        {["Safe", "Measured", "Balanced", "Ambitious", "Aggressive"][riskTolerance]}
                       </span>
                     </div>
                     <Slider
@@ -1865,11 +2207,27 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <Pill tone="slate">Current TAC</Pill>
                       <Pill tone="violet">{selectedTac}</Pill>
-                      <Pill tone="blue">{tacScopedOptions.length} options analysed</Pill>
-                      <Pill tone="emerald">{preferences.filter((key) => UNIVERSITY_RULES.find((u) => u.key === key)?.tac === selectedTac).length} selected in this TAC</Pill>
+                      <Pill tone="blue">
+                        {tacScopedOptions.length} options analysed
+                      </Pill>
+                      <Pill tone="emerald">
+                        {
+                          preferences.filter(
+                            (key) =>
+                              UNIVERSITY_RULES.find((u) => u.key === key)?.tac ===
+                              selectedTac
+                          ).length
+                        }{" "}
+                        selected in this TAC
+                      </Pill>
                     </div>
                     <p className="mt-3 text-sm text-slate-600">
-                      The optimiser now builds Safe, Normal, and Aggressive lists strictly inside <span className="font-semibold text-slate-900">{selectedTac}</span>. No cross-TAC mixing.
+                      The optimiser now builds Safe, Normal, and Aggressive lists
+                      strictly inside{" "}
+                      <span className="font-semibold text-slate-900">
+                        {selectedTac}
+                      </span>
+                      . No cross-TAC mixing.
                     </p>
                   </div>
                 </div>
@@ -1911,20 +2269,22 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                 </p>
 
                 <div className="mb-5 grid gap-2 sm:grid-cols-3">
-                  {(["aggressive", "normal", "safe"] as PreferenceGoal[]).map((goal) => (
-                    <button
-                      key={goal}
-                      onClick={() => setPreferenceGoal(goal)}
-                      className={cn(
-                        "rounded-2xl border px-4 py-3 text-sm font-semibold transition",
-                        preferenceGoal === goal
-                          ? "border-slate-950 bg-slate-950 text-white"
-                          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                      )}
-                    >
-                      {PREFERENCE_GOAL_LABEL[goal]}
-                    </button>
-                  ))}
+                  {(["aggressive", "normal", "safe"] as PreferenceGoal[]).map(
+                    (goal) => (
+                      <button
+                        key={goal}
+                        onClick={() => setPreferenceGoal(goal)}
+                        className={cn(
+                          "rounded-2xl border px-4 py-3 text-sm font-semibold transition",
+                          preferenceGoal === goal
+                            ? "border-slate-950 bg-slate-950 text-white"
+                            : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                        )}
+                      >
+                        {PREFERENCE_GOAL_LABEL[goal]}
+                      </button>
+                    )
+                  )}
                 </div>
 
                 <div className="grid gap-3">
@@ -1936,7 +2296,9 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                         key={uni.key}
                         className={cn(
                           "flex items-center justify-between rounded-2xl border px-4 py-3",
-                          selected ? "border-violet-200 bg-violet-50" : "border-slate-200 bg-slate-50"
+                          selected
+                            ? "border-violet-200 bg-violet-50"
+                            : "border-slate-200 bg-slate-50"
                         )}
                       >
                         <div className="flex items-center gap-3">
@@ -1945,7 +2307,9 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <div className="font-semibold text-slate-950">{uni.name}</div>
+                              <div className="font-semibold text-slate-950">
+                                {uni.name}
+                              </div>
                               {selected ? <Pill tone="violet">Selected</Pill> : null}
                             </div>
                             <div className="text-xs text-slate-500">
@@ -1953,7 +2317,17 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                             </div>
                           </div>
                         </div>
-                        <Pill tone={uni.band === "strong" ? "emerald" : uni.band === "competitive" ? "blue" : uni.band === "possible" ? "amber" : "rose"}>
+                        <Pill
+                          tone={
+                            uni.band === "strong"
+                              ? "emerald"
+                              : uni.band === "competitive"
+                                ? "blue"
+                                : uni.band === "possible"
+                                  ? "amber"
+                                  : "rose"
+                          }
+                        >
                           {bandLabel(uni.band)}
                         </Pill>
                       </div>
@@ -2006,9 +2380,9 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                       value={ucat}
                       onChange={setUcat}
                       min={0}
-                      max={3600}
+                      max={UCAT_MAX}
                       step={10}
-                      placeholder="900-2700+"
+                      placeholder="900-2700"
                     />
                   </div>
 
@@ -2132,7 +2506,7 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                     value={ucat}
                     onChange={setUcat}
                     min={0}
-                    max={3600}
+                    max={UCAT_MAX}
                     step={10}
                   />
                   <FilterSelect
@@ -2255,13 +2629,14 @@ export default function OptimiseClient({ isPremium }: { isPremium: boolean }) {
                     </div>
                     <Slider
                       value={scenarioUCATDelta}
-                      min={-400}
-                      max={400}
+                      min={-300}
+                      max={300}
                       step={10}
                       onChange={setScenarioUCATDelta}
                     />
                     <div className="text-xs text-slate-500">
-                      Current {ucat} → Simulated {ucat + scenarioUCATDelta}
+                      Current {ucat} → Simulated{" "}
+                      {clamp(ucat + scenarioUCATDelta, 0, UCAT_MAX)}
                     </div>
                   </div>
                 </div>

@@ -110,13 +110,13 @@ type CommandProgress = {
 };
 
 type VitalsEvent = {
-  id: number;
+  id: string | number;
   source: string;
   delta: number;
   reason: string;
-  metadata: Record<string, unknown>;
-  occurred_at: string;
-  created_at: string;
+  metadata: unknown;
+  occurred_at: string | null;
+  created_at: string | null;
 };
 
 type CommandClientProps = {
@@ -1065,61 +1065,61 @@ useEffect(() => {
     }
   }
     async function addCustomDate() {
-    if (!draftDate.title || !draftDate.date) return;
+  if (!draftDate.title || !draftDate.date) return;
 
-    setEventMessage("");
+  setEventMessage("");
 
-    const payload = {
-      clerk_user_id: userId,
-      title: draftDate.title,
-      date: draftDate.date,
-      type: draftDate.type,
-      notes: draftDate.notes,
-      source: "custom",
-    };
+  const payload = {
+    clerk_user_id: userId,
+    title: draftDate.title,
+    event_date: draftDate.date,
+    event_type: draftDate.type,
+    notes: draftDate.notes,
+    source: "custom",
+  };
 
-    const { data, error } = await supabase
-      .from("command_events")
-      .insert(payload)
-      .select("id, title, date, type, notes, source")
-      .single();
+  const { data, error } = await supabase
+    .from("command_events")
+    .insert(payload)
+    .select("id, title, event_date, event_type, notes, source")
+    .single();
 
-    if (error || !data) {
-      setEventMessage("Failed to save custom date.");
-      return;
-    }
-
-    setCustomDates((current) => [
-      ...current,
-      {
-        id: String(data.id),
-        title: data.title,
-        date: data.date,
-        type: data.type as EventType,
-        notes: data.notes ?? "",
-        source: "custom",
-      },
-    ]);
-
-    setDraftDate({
-      title: "",
-      date: "",
-      type: "personal",
-      notes: "",
-    });
-
-    await awardVitals({
-      source: "custom_date_add",
-      delta: 5,
-      reason: "Added custom command date",
-      metadata: {
-        title: data.title,
-        type: data.type,
-      },
-    });
-
-    setEventMessage("Custom date added. +5 Vitals");
+  if (error || !data) {
+    setEventMessage("Failed to save custom date.");
+    return;
   }
+
+  setCustomDates((current) => [
+    ...current,
+    {
+      id: String(data.id),
+      title: data.title,
+      date: data.event_date,
+      type: data.event_type as EventType,
+      notes: data.notes ?? "",
+      source: "custom",
+    },
+  ]);
+
+  setDraftDate({
+    title: "",
+    date: "",
+    type: "personal",
+    notes: "",
+  });
+
+  await awardVitals({
+    source: "custom_date_add",
+    delta: 5,
+    reason: "Added custom command date",
+    metadata: {
+      title: data.title,
+      type: data.event_type,
+    },
+  });
+
+  setEventMessage("Custom date added. +5 Vitals");
+}
 
   async function removeCustomDate(id: string) {
     const existing = customDates.find((event) => event.id === id);
@@ -2279,7 +2279,7 @@ useEffect(() => {
                         {event.reason}
                       </div>
                       <div className="mt-1 text-sm text-slate-500">
-                        {formatDateTime(event.occurred_at)}
+                        {event.occurred_at ? formatDateTime(event.occurred_at) : "Unknown time"}
                       </div>
                     </div>
                     <div
