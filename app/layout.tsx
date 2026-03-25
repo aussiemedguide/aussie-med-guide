@@ -12,7 +12,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.aussiemedguide.com"),
+  metadataBase: new URL("https://aussiemedguide.com"),
   title: {
     default: "Aussie Med Guide",
     template: "%s | Aussie Med Guide",
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     title: "Aussie Med Guide",
     description:
       "Compare Australian medical schools, understand entry requirements, and prepare for UCAT, ATAR, and interviews.",
-    url: "https://www.aussiemedguide.com",
+    url: "https://aussiemedguide.com",
     siteName: "Aussie Med Guide",
     locale: "en_AU",
     type: "website",
@@ -84,11 +84,9 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider
-      afterSignOutUrl="/"
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
-      signInFallbackRedirectUrl="/tools/command"
-      signUpFallbackRedirectUrl="/tools/command"
+      afterSignOutUrl="/"
     >
       <html lang="en">
         <body className={jakarta.className}>
