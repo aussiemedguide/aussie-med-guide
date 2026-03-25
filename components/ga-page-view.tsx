@@ -21,6 +21,7 @@ export default function GaPageView() {
       page_path: pathname,
       page_location: window.location.href,
       send_to: "G-WTQDQGY7EY",
+      debug_mode: true,
     });
   }, [pathname]);
 
