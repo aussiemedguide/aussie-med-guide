@@ -83,7 +83,13 @@ export default function RootLayout({
   children: ReactNode;
 }) {
   return (
-    <ClerkProvider afterSignOutUrl="/">
+    <ClerkProvider
+      afterSignOutUrl="/"
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      signInFallbackRedirectUrl="/tools/command"
+      signUpFallbackRedirectUrl="/tools/command"
+    >
       <html lang="en">
         <body className={jakarta.className}>
           <PostHogProvider>{children}</PostHogProvider>
