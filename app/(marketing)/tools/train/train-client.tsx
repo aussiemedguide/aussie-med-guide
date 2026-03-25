@@ -2,10 +2,19 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import SignOutButton from "@/components/auth/sign-out-button";
 import { useScribe } from "@elevenlabs/react";
 import PulseOrb from "@/components/train/PulseOrb";
 import { createClient } from "@/lib/supabase/client";
+import {
+  ARENA_BOSSES,
+  getBossById,
+  isBossUnlocked,
+  type ArenaBoss,
+  type ArenaBossId,
+  type ArenaQuestion,
+  type ArenaScoreBreakdown,
+  type ArenaSessionPayload,
+} from "./_lib/interview-arena";
 import {
   ArrowRight,
   Brain,
@@ -23,6 +32,9 @@ import {
   Trophy,
   Users,
   Wand2,
+  Crown,
+  Shield,
+  Mic2,
 } from "lucide-react";
 
 type TrainClientProps = {
@@ -31,9 +43,22 @@ type TrainClientProps = {
 };
 
 type TrainTab = "readiness" | "ucat" | "atar" | "interview";
-type InterviewTab = "practice" | "stories" | "progress";
+type InterviewTab = "practice" | "stories" | "progress" | "arena";
 type InterviewMode = "MMI" | "Panel";
 type StateKey = "NSW_ACT" | "QLD" | "VIC" | "WA" | "SA_NT" | "TAS";
+type MomentumState = "cold" | "warming_up" | "active" | "locked_in" | "elite";
+
+type CommandProgress = {
+  clerk_user_id: string;
+  vitals_total: number;
+  vitals_today: number;
+  momentum_state: MomentumState;
+  active_days_this_week: number;
+  boss_level_unlocked: number;
+  last_activity_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
 
 type UcatAttempt = {
   id: string;
@@ -107,6 +132,21 @@ type InterviewAttemptRow = {
   overall: number;
   feedback: string;
   improvements: string[] | null;
+};
+
+type ArenaRunResult = {
+  success: boolean;
+  result: "won" | "lost" | "completed";
+  pass: boolean;
+  feedback: string;
+  vitalsAwarded: number;
+  breakdown: ArenaScoreBreakdown;
+  updatedProgress: CommandProgress | null;
+  boss: {
+    level: number;
+    title: string;
+    name: string;
+  };
 };
 
 const ucatStorageKey = "amg-train-ucat";
@@ -350,7 +390,8 @@ const panelQuestions: PanelPrompt[] = [
   },
   {
     title: "Ethics",
-    prompt: "A patient refuses a treatment you believe could save their life. How would you approach the situation?",
+    prompt:
+      "A patient refuses a treatment you believe could save their life. How would you approach the situation?",
     theme: "Ethics",
   },
 ];
@@ -399,6 +440,50 @@ function getScoreTone(value: number) {
   return "rose";
 }
 
+function getMomentumLabel(state: MomentumState) {
+  switch (state) {
+    case "elite":
+      return "Elite Rhythm";
+    case "locked_in":
+      return "Locked In";
+    case "active":
+      return "Active";
+    case "warming_up":
+      return "Warming Up";
+    default:
+      return "Cold";
+  }
+}
+
+function getLevelFromVitals(vitals: number) {
+  if (vitals >= 1500) return 7;
+  if (vitals >= 1100) return 6;
+  if (vitals >= 800) return 5;
+  if (vitals >= 550) return 4;
+  if (vitals >= 325) return 3;
+  if (vitals >= 150) return 2;
+  return 1;
+}
+
+function getLevelLabel(level: number) {
+  switch (level) {
+    case 1:
+      return "Starter";
+    case 2:
+      return "Builder";
+    case 3:
+      return "Contender";
+    case 4:
+      return "Interview Ready";
+    case 5:
+      return "Offer Hunter";
+    case 6:
+      return "Final Round";
+    default:
+      return "White Coat Track";
+  }
+}
+
 function getSubjectImpact(state: StateKey, subject: string) {
   const s = subject.toLowerCase();
 
@@ -435,7 +520,11 @@ function getSubjectImpact(state: StateKey, subject: string) {
   }
 
   if (state === "VIC") {
-    if (s.includes("methods") || s.includes("specialist") || s.includes("languages")) {
+    if (
+      s.includes("methods") ||
+      s.includes("specialist") ||
+      s.includes("languages")
+    ) {
       return {
         tag: "Extra rules",
         text: "VTAC specifically notes additional scaling rules for mathematics and languages.",
@@ -505,7 +594,12 @@ function Card({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-3xl border border-slate-200 bg-white shadow-sm", className)}>
+    <section
+      className={cn(
+        "rounded-3xl border border-slate-200 bg-white shadow-sm",
+        className
+      )}
+    >
       {children}
     </section>
   );
@@ -622,7 +716,9 @@ function ProgressBar({
     <div>
       <div className="mb-2 flex items-center justify-between gap-3">
         <span className="text-sm font-medium text-slate-700">{label}</span>
-        <span className="text-sm font-semibold text-slate-900">{Math.round(value)}/100</span>
+        <span className="text-sm font-semibold text-slate-900">
+          {Math.round(value)}/100
+        </span>
       </div>
       <div className="h-2 rounded-full bg-slate-200">
         <div
@@ -665,7 +761,9 @@ function PracticeMetricTile({
       <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
         {label}
       </div>
-      <div className="mt-2 text-2xl font-black tracking-tight text-slate-950">{value}</div>
+      <div className="mt-2 text-2xl font-black tracking-tight text-slate-950">
+        {value}
+      </div>
       <div className="mt-1 text-xs text-slate-600">{sub}</div>
     </div>
   );
@@ -696,7 +794,9 @@ function InterviewModeButton({
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-slate-900">{label}</div>
-          <div className="mt-1 text-sm leading-6 text-slate-600">{description}</div>
+          <div className="mt-1 text-sm leading-6 text-slate-600">
+            {description}
+          </div>
         </div>
         {active ? (
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500 text-white">
@@ -716,7 +816,7 @@ function StudioPanel({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm", className)}>
+    <div className={cn("rounded-3xl border border-slate-200 bg-white p-5 shadow-sm", className)}>
       {children}
     </div>
   );
@@ -743,7 +843,9 @@ function ScoreChip({
 
   return (
     <div className={cn("rounded-2xl border px-3 py-3", toneClasses)}>
-      <div className="text-[11px] font-bold uppercase tracking-[0.16em]">{label}</div>
+      <div className="text-[11px] font-bold uppercase tracking-[0.16em]">
+        {label}
+      </div>
       <div className="mt-1 text-lg font-black">{score}</div>
     </div>
   );
@@ -758,7 +860,10 @@ function PremiumLockedTrainPreview() {
       <div className="relative z-0 p-6 sm:p-8">
         <div className="grid gap-3 md:grid-cols-4">
           {[0, 1, 2, 3].map((item) => (
-            <div key={item} className="rounded-3xl border border-slate-200 bg-white p-4">
+            <div
+              key={item}
+              className="rounded-3xl border border-slate-200 bg-white p-4"
+            >
               <div className="h-5 w-24 rounded-full bg-slate-200" />
               <div className="mt-4 h-5 w-40 rounded bg-slate-200" />
               <div className="mt-2 h-4 w-full rounded bg-slate-100" />
@@ -796,16 +901,20 @@ function PremiumLockedTrainPreview() {
             <Lock className="h-6 w-6" />
           </div>
 
-          <h2 className="mt-4 text-2xl font-bold text-slate-950">Train is a Pro feature</h2>
+          <h2 className="mt-4 text-2xl font-bold text-slate-950">
+            Train is a Pro feature
+          </h2>
 
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Unlock the full preparation suite: readiness tracking, UCAT logging, ATAR risk
-            management, interview practice, and structured story-bank tools.
+            Unlock the full preparation suite: readiness tracking, UCAT logging,
+            ATAR risk management, interview practice, and structured story-bank
+            tools.
           </p>
 
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            The interview system saves evaluated attempts so users can track genuine improvement over
-            time, not just practise once and lose everything.
+            The interview system saves evaluated attempts so users can track
+            genuine improvement over time, not just practise once and lose
+            everything.
           </p>
 
           <a
@@ -836,6 +945,18 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
     { id: makeId(), name: "Physics" },
   ]);
 
+  const [commandProgress, setCommandProgress] = useState<CommandProgress>({
+    clerk_user_id: userId,
+    vitals_total: 0,
+    vitals_today: 0,
+    momentum_state: "cold",
+    active_days_this_week: 0,
+    boss_level_unlocked: 1,
+    last_activity_at: null,
+    created_at: null,
+    updated_at: null,
+  });
+
   const [ucatAttempts, setUcatAttempts] = useState<UcatAttempt[]>([]);
   const [stories, setStories] = useState<StoryItem[]>([]);
   const [practiceHistory, setPracticeHistory] = useState<PracticeAttempt[]>([]);
@@ -845,12 +966,12 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
     id: "",
     date: new Date().toISOString().slice(0, 10),
     label: "Mock",
-    total: 2800,
-    vr: 650,
-    dm: 700,
-    qr: 700,
-    ar: 750,
-    sjt: 600,
+    total: 2400,
+    vr: 600,
+    dm: 600,
+    qr: 600,
+    ar: 600,
+    sjt: 550,
   });
 
   const [atarSelfReadiness, setAtarSelfReadiness] = useState(72);
@@ -876,6 +997,16 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
     tags: "",
   });
 
+  const [arenaSelectedBossId, setArenaSelectedBossId] =
+    useState<ArenaBossId>("warm_up_clinician");
+  const [arenaSession, setArenaSession] = useState<ArenaSessionPayload | null>(null);
+  const [arenaRunId, setArenaRunId] = useState<number | null>(null);
+  const [arenaResponse, setArenaResponse] = useState("");
+  const [arenaQuestionIndex, setArenaQuestionIndex] = useState(0);
+  const [arenaResult, setArenaResult] = useState<ArenaRunResult | null>(null);
+  const [isStartingArena, setIsStartingArena] = useState(false);
+  const [isSubmittingArena, setIsSubmittingArena] = useState(false);
+
   const pulseVoiceIdMmi =
     process.env.NEXT_PUBLIC_PULSE_VOICE_ID_MMI || "JBFqnCBsd6RMkjVDRZzb";
   const pulseVoiceIdPanel =
@@ -887,12 +1018,34 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
   const [voiceModeEnabled, setVoiceModeEnabled] = useState(true);
   const [autoPlayQuestion, setAutoPlayQuestion] = useState(true);
 
-  const currentVoiceId = interviewMode === "MMI" ? pulseVoiceIdMmi : pulseVoiceIdPanel;
-  const currentVoiceProfile = interviewMode === "MMI" ? "mmi" : "panel";
+  const selectedArenaBoss =
+    getBossById(arenaSelectedBossId) ?? ARENA_BOSSES[0];
+
+  const arenaCurrentQuestion =
+    arenaSession?.questions?.[arenaQuestionIndex] ?? null;
+
+  const currentVoiceId =
+    interviewTab === "arena"
+      ? selectedArenaBoss.mode === "mmi"
+        ? pulseVoiceIdMmi
+        : pulseVoiceIdPanel
+      : interviewMode === "MMI"
+        ? pulseVoiceIdMmi
+        : pulseVoiceIdPanel;
+
+  const currentVoiceProfile =
+    interviewTab === "arena"
+      ? selectedArenaBoss.mode
+      : interviewMode === "MMI"
+        ? "mmi"
+        : "panel";
+
   const currentQuestionText =
-    interviewMode === "MMI"
-      ? currentPrompt?.questions[currentQuestionIndex] || ""
-      : currentPanelPrompt?.prompt || "";
+    interviewTab === "arena"
+      ? arenaCurrentQuestion?.prompt || arenaSession?.introScript || ""
+      : interviewMode === "MMI"
+        ? currentPrompt?.questions[currentQuestionIndex] || ""
+        : currentPanelPrompt?.prompt || "";
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const committedTranscriptRef = useRef("");
@@ -909,9 +1062,16 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
             ? data.text
             : "";
 
-      setCurrentResponse(
-        [committedTranscriptRef.current, partialText].filter(Boolean).join(" ").trim()
-      );
+      const merged = [committedTranscriptRef.current, partialText]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      if (interviewTab === "arena") {
+        setArenaResponse(merged);
+      } else {
+        setCurrentResponse(merged);
+      }
     },
     onCommittedTranscript: (data) => {
       const committedText =
@@ -921,14 +1081,40 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
             ? data.text
             : "";
 
-      committedTranscriptRef.current = [committedTranscriptRef.current, committedText]
+      committedTranscriptRef.current = [
+        committedTranscriptRef.current,
+        committedText,
+      ]
         .filter(Boolean)
         .join(" ")
         .trim();
 
-      setCurrentResponse(committedTranscriptRef.current);
+      if (interviewTab === "arena") {
+        setArenaResponse(committedTranscriptRef.current);
+      } else {
+        setCurrentResponse(committedTranscriptRef.current);
+      }
     },
   });
+
+  async function refreshCommandProgress() {
+    try {
+      const res = await fetch("/api/command/progress", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) return;
+
+      if (data?.progress) {
+        setCommandProgress(data.progress as CommandProgress);
+      }
+    } catch {
+      // silent
+    }
+  }
 
   async function speakCurrentQuestion() {
     if (!voiceModeEnabled || !currentQuestionText || !currentVoiceId) return;
@@ -976,7 +1162,11 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
 
   async function startVoiceAnswer() {
     try {
-      committedTranscriptRef.current = currentResponse.trim();
+      committedTranscriptRef.current =
+        interviewTab === "arena"
+          ? arenaResponse.trim()
+          : currentResponse.trim();
+
       setPulseMode("listening");
 
       const tokenRes = await fetch("/api/train/voice/scribe-token", {
@@ -1009,7 +1199,12 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
 
   function clearVoiceTranscript() {
     committedTranscriptRef.current = "";
-    setCurrentResponse("");
+
+    if (interviewTab === "arena") {
+      setArenaResponse("");
+    } else {
+      setCurrentResponse("");
+    }
   }
 
   useEffect(() => {
@@ -1044,6 +1239,11 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
 
   useEffect(() => {
     if (!isPremium || !userId) return;
+    void refreshCommandProgress();
+  }, [isPremium, userId]);
+
+  useEffect(() => {
+    if (!isPremium || !userId) return;
 
     let cancelled = false;
 
@@ -1061,7 +1261,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
       if (cancelled) return;
 
       if (!error && data) {
-        setPracticeHistory((data as unknown as InterviewAttemptRow[]).map(mapDbAttempt));
+        setPracticeHistory(
+          (data as unknown as InterviewAttemptRow[]).map(mapDbAttempt)
+        );
       }
 
       setIsLoadingPractice(false);
@@ -1091,7 +1293,13 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
     if (voiceModeEnabled && autoPlayQuestion && currentQuestionText) {
       void speakCurrentQuestion();
     }
-  }, [currentQuestionText, currentVoiceId, currentVoiceProfile, voiceModeEnabled, autoPlayQuestion]);
+  }, [
+    currentQuestionText,
+    currentVoiceId,
+    currentVoiceProfile,
+    voiceModeEnabled,
+    autoPlayQuestion,
+  ]);
 
   const latestUcat = ucatAttempts[0] ?? null;
   const averageUcat = Math.round(avg(ucatAttempts.map((x) => x.total)));
@@ -1114,7 +1322,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
 
   const ucatReadiness = useMemo(() => {
     if (!latestUcat) return 35;
-    return Math.max(25, Math.min(100, Math.round((latestUcat.total / 3600) * 100)));
+    return Math.max(25, Math.min(100, Math.round((latestUcat.total / 2700) * 100)));
   }, [latestUcat]);
 
   const storyBankScore = useMemo(() => {
@@ -1130,7 +1338,13 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
       storyBankScore * 0.1;
 
     return Math.round(score);
-  }, [atarSelfReadiness, ucatReadiness, interviewAverage, applicationReadiness, storyBankScore]);
+  }, [
+    atarSelfReadiness,
+    ucatReadiness,
+    interviewAverage,
+    applicationReadiness,
+    storyBankScore,
+  ]);
 
   const readinessFocus = useMemo(() => {
     const items = [
@@ -1142,7 +1356,13 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
     ];
 
     return [...items].sort((a, b) => a.value - b.value)[0];
-  }, [atarSelfReadiness, ucatReadiness, interviewAverage, applicationReadiness, storyBankScore]);
+  }, [
+    atarSelfReadiness,
+    ucatReadiness,
+    interviewAverage,
+    applicationReadiness,
+    storyBankScore,
+  ]);
 
   const progressAverages = useMemo(() => {
     return {
@@ -1160,8 +1380,12 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
   const responseWords = useMemo(() => wordCount(currentResponse), [currentResponse]);
   const responseCharacters = currentResponse.length;
 
+  const arenaWords = useMemo(() => wordCount(arenaResponse), [arenaResponse]);
+  const arenaCharacters = arenaResponse.length;
+
   const sessionTheme = currentPrompt?.theme || currentPanelPrompt?.theme || "Practice";
-  const sessionTitle = currentPrompt?.title || currentPanelPrompt?.title || "No session loaded";
+  const sessionTitle =
+    currentPrompt?.title || currentPanelPrompt?.title || "No session loaded";
   const currentQuestionCount = currentPrompt?.questions.length ?? 1;
   const sessionProgress =
     interviewMode === "MMI" && currentPrompt
@@ -1169,6 +1393,25 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
       : currentPanelPrompt
         ? 100
         : 0;
+
+  const arenaVitals = commandProgress.vitals_total ?? 0;
+  const arenaToday = commandProgress.vitals_today ?? 0;
+  const arenaMomentum = commandProgress.momentum_state ?? "cold";
+  const arenaActiveDays = commandProgress.active_days_this_week ?? 0;
+  const arenaUnlockedBossLevel = commandProgress.boss_level_unlocked ?? 1;
+  const arenaApplicantLevel = getLevelFromVitals(arenaVitals);
+  const arenaApplicantLevelLabel = getLevelLabel(arenaApplicantLevel);
+
+  const unlockedBosses = useMemo(() => {
+    return ARENA_BOSSES.map((boss) => ({
+      boss,
+      unlocked: isBossUnlocked({
+        boss,
+        vitalsTotal: arenaVitals,
+        momentumState: arenaMomentum,
+      }),
+    }));
+  }, [arenaVitals, arenaMomentum]);
 
   const personalBest = useMemo(() => {
     if (!practiceHistory.length) return 0;
@@ -1216,6 +1459,13 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
     committedTranscriptRef.current = "";
   }
 
+  function resetArenaDraft() {
+    setArenaResponse("");
+    setArenaQuestionIndex(0);
+    setArenaResult(null);
+    committedTranscriptRef.current = "";
+  }
+
   function generateNewPrompt() {
     setLatestFeedback(null);
     setCurrentResponse("");
@@ -1234,6 +1484,96 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
       const random = panelQuestions[Math.floor(Math.random() * panelQuestions.length)];
       setCurrentPanelPrompt(random);
       setCurrentPrompt(null);
+    }
+  }
+
+  async function startArenaRun() {
+    setIsStartingArena(true);
+    setArenaResult(null);
+    setArenaResponse("");
+    setArenaQuestionIndex(0);
+    committedTranscriptRef.current = "";
+
+    try {
+      const res = await fetch("/api/train/arena/start", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bossId: arenaSelectedBossId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to start arena run.");
+      }
+
+      setArenaRunId(data.runId as number);
+      setArenaSession(data.session as ArenaSessionPayload);
+      setTimerSeconds(0);
+      setIsRunningTimer(true);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to start Interview Arena run.");
+    } finally {
+      setIsStartingArena(false);
+    }
+  }
+
+  async function submitArenaRun() {
+    if (!arenaRunId || !arenaResponse.trim()) return;
+
+    setIsSubmittingArena(true);
+    setIsRunningTimer(false);
+
+    try {
+      const res = await fetch("/api/train/arena/complete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          runId: arenaRunId,
+          response: arenaResponse.trim(),
+          title: `${selectedArenaBoss.title} Arena Run`,
+        }),
+      });
+
+      const data = (await res.json()) as ArenaRunResult | { error?: string };
+
+      if (!res.ok) {
+        throw new Error(("error" in data && data.error) || "Failed to complete arena run.");
+      }
+
+      const resultData = data as ArenaRunResult;
+      setArenaResult(resultData);
+
+      if (resultData.updatedProgress) {
+        setCommandProgress(resultData.updatedProgress);
+      } else {
+        await refreshCommandProgress();
+      }
+
+      const { data: attempts } = await supabase
+        .from("interview_attempts")
+        .select(
+          "id, created_at, mode, title, prompt, response, clarity, reasoning, empathy, structure, professionalism, overall, feedback, improvements"
+        )
+        .eq("clerk_user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(8);
+
+      if (attempts) {
+        setPracticeHistory((attempts as unknown as InterviewAttemptRow[]).map(mapDbAttempt));
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to submit arena run.");
+    } finally {
+      setIsSubmittingArena(false);
     }
   }
 
@@ -1305,6 +1645,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
       setPracticeHistory((prev) => [item, ...prev]);
       setLatestFeedback(item);
       setInterviewTab("progress");
+      await refreshCommandProgress();
     } catch (error) {
       console.error(error);
       alert("Failed to evaluate and save response.");
@@ -1350,7 +1691,13 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
   }
 
   function saveStory() {
-    if (!storyForm.title || !storyForm.situation || !storyForm.action || !storyForm.result) return;
+    if (
+      !storyForm.title ||
+      !storyForm.situation ||
+      !storyForm.action ||
+      !storyForm.result
+    )
+      return;
 
     const item: StoryItem = {
       id: makeId(),
@@ -1398,6 +1745,13 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
             <Sparkles className="h-4 w-4" />
             Build skills and track measurable progress
           </div>
+
+          {isPremium ? (
+            <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-700">
+              <Crown className="h-4 w-4" />
+              {arenaVitals} Vitals · {getMomentumLabel(arenaMomentum)}
+            </div>
+          ) : null}
         </div>
 
         <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
@@ -1416,8 +1770,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                   Train
                 </h1>
                 <p className="mt-2 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
-                  Build skills and track measurable progress with a cleaner, more dynamic preparation
-                  suite for UCAT, ATAR strategy, and interview development.
+                  Build skills and track measurable progress with a cleaner, more
+                  dynamic preparation suite for UCAT, ATAR strategy, interview
+                  development, and Interview Arena progression.
                 </p>
               </div>
             </div>
@@ -1436,13 +1791,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                 tone="blue"
               />
               <PracticeMetricTile
-                label="Personal best"
-                value={`${Math.round(personalBest)}`}
-                sub={
-                  recentMomentum === 0
-                    ? "No momentum yet"
-                    : `${recentMomentum > 0 ? "+" : ""}${recentMomentum} vs previous`
-                }
+                label="Arena level"
+                value={`Lv ${arenaApplicantLevel}`}
+                sub={arenaApplicantLevelLabel}
                 tone="violet"
               />
             </div>
@@ -1456,493 +1807,502 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
         ) : (
           <>
             <div className="mt-6 grid gap-3 md:grid-cols-4">
-  <TopTab
-    active={activeTab === "readiness"}
-    icon={Target}
-    title="Overall Readiness Score"
-    text="Composite score across academics, UCAT, application confidence, and interview work."
-    onClick={() => setActiveTab("readiness")}
-  />
-  <TopTab
-    active={activeTab === "ucat"}
-    icon={Brain}
-    title="UCAT Performance Hub"
-    text="Track mocks, compare totals, and find your weakest subtest quickly."
-    onClick={() => setActiveTab("ucat")}
-  />
-  <TopTab
-    active={activeTab === "atar"}
-    icon={GraduationCap}
-    title="ATAR Risk Management"
-    text="See how state systems and subject choices might shape your academic risk."
-    onClick={() => setActiveTab("atar")}
-  />
-  <TopTab
-    active={activeTab === "interview"}
-    icon={Users}
-    title="Interview Practice System"
-    text="Generate prompts, record responses, and review rubric-based feedback."
-    onClick={() => setActiveTab("interview")}
-  />
-</div>
-
-<div className="mt-6 space-y-6">
-  {activeTab === "readiness" && (
-    <>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Overall readiness"
-          value={`${overallReadiness}`}
-          hint={getReadinessBand(overallReadiness)}
-          icon={Target}
-        />
-        <StatCard
-          label="Average UCAT"
-          value={averageUcat ? `${averageUcat}` : "—"}
-          hint={latestUcat ? `Latest: ${latestUcat.total}` : "No mocks logged yet"}
-          icon={Brain}
-        />
-        <StatCard
-          label="Interview average"
-          value={`${Math.round(interviewAverage)}`}
-          hint={`${practiceHistory.length} saved attempts`}
-          icon={Users}
-        />
-        <StatCard
-          label="Story bank"
-          value={`${stories.length}`}
-          hint="Examples ready for interviews"
-          icon={Wand2}
-        />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <Card className="p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-emerald-600">
-                Composite readiness
-              </p>
-              <h2 className="mt-2 text-2xl font-bold text-slate-950">
-                {getReadinessBand(overallReadiness)}
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                This blends your self-rated academic readiness, UCAT performance,
-                interview history, application confidence, and story-bank depth.
-              </p>
-            </div>
-
-            <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-right">
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
-                Current score
-              </p>
-              <p className="mt-1 text-3xl font-bold text-emerald-700">
-                {overallReadiness}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-6 space-y-5">
-            <ProgressBar label="ATAR readiness" value={atarSelfReadiness} tone="blue" />
-            <ProgressBar label="UCAT readiness" value={ucatReadiness} tone="violet" />
-            <ProgressBar
-              label="Interview readiness"
-              value={interviewAverage}
-              tone="emerald"
-            />
-            <ProgressBar
-              label="Application readiness"
-              value={applicationReadiness}
-              tone="amber"
-            />
-            <ProgressBar label="Story bank strength" value={storyBankScore} />
-          </div>
-        </Card>
-
-        <div className="space-y-6">
-          <Card className="p-6">
-            <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-              Priority focus
-            </p>
-            <h3 className="mt-2 text-xl font-bold text-slate-950">
-              Improve your {readinessFocus.key}
-            </h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              This is currently your lowest-scoring pillar, so improving it will lift
-              your overall readiness fastest.
-            </p>
-            <div className="mt-4 rounded-2xl bg-slate-50 p-4">
-              <p className="text-sm font-medium text-slate-700">
-                Current score:{" "}
-                <span className="font-bold text-slate-950">
-                  {Math.round(readinessFocus.value)}/100
-                </span>
-              </p>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-              Adjust confidence inputs
-            </p>
-
-            <div className="mt-5 space-y-5">
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm font-medium text-slate-700">
-                    ATAR self-readiness
-                  </label>
-                  <span className="text-sm font-semibold text-slate-900">
-                    {atarSelfReadiness}/100
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={atarSelfReadiness}
-                  onChange={(e) => setAtarSelfReadiness(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm font-medium text-slate-700">
-                    Application readiness
-                  </label>
-                  <span className="text-sm font-semibold text-slate-900">
-                    {applicationReadiness}/100
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={applicationReadiness}
-                  onChange={(e) => setApplicationReadiness(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </div>
-          </Card>
-        </div>
-      </div>
-    </>
-  )}
-
-  {activeTab === "ucat" && (
-    <>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Latest total"
-          value={latestUcat ? `${latestUcat.total}` : "—"}
-          hint={latestUcat ? formatDate(latestUcat.date) : "No attempt added yet"}
-          icon={Brain}
-        />
-        <StatCard
-          label="Average total"
-          value={averageUcat ? `${averageUcat}` : "—"}
-          hint={`${ucatAttempts.length} recorded attempts`}
-          icon={LineChart}
-        />
-        <StatCard
-          label="Weakest subtest"
-          value={weakSubtest}
-          hint="Based on your latest logged mock"
-          icon={CircleAlert}
-        />
-        <StatCard
-          label="Readiness score"
-          value={`${ucatReadiness}`}
-          hint="Converted from your latest total"
-          icon={Target}
-        />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-        <Card className="p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-                Add new result
-              </p>
-              <h3 className="mt-2 text-xl font-bold text-slate-950">
-                Log a UCAT mock
-              </h3>
-            </div>
-
-            <div className="rounded-2xl bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700">
-              Track trends, not one-off highs
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Date
-              </label>
-              <input
-                type="date"
-                value={ucatForm.date}
-                onChange={(e) =>
-                  setUcatForm((prev) => ({ ...prev, date: e.target.value }))
-                }
-                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
+              <TopTab
+                active={activeTab === "readiness"}
+                icon={Target}
+                title="Overall Readiness Score"
+                text="Composite score across academics, UCAT, application confidence, and interview work."
+                onClick={() => setActiveTab("readiness")}
+              />
+              <TopTab
+                active={activeTab === "ucat"}
+                icon={Brain}
+                title="UCAT Performance Hub"
+                text="Track mocks, compare totals, and find your weakest subtest quickly."
+                onClick={() => setActiveTab("ucat")}
+              />
+              <TopTab
+                active={activeTab === "atar"}
+                icon={GraduationCap}
+                title="ATAR Risk Management"
+                text="See how state systems and subject choices might shape your academic risk."
+                onClick={() => setActiveTab("atar")}
+              />
+              <TopTab
+                active={activeTab === "interview"}
+                icon={Users}
+                title="Interview Practice System"
+                text="Generate prompts, record responses, and review rubric-based feedback."
+                onClick={() => setActiveTab("interview")}
               />
             </div>
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Label
-              </label>
-              <input
-                type="text"
-                value={ucatForm.label}
-                onChange={(e) =>
-                  setUcatForm((prev) => ({ ...prev, label: e.target.value }))
-                }
-                placeholder="Mock, official, timed practice"
-                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
-              />
-            </div>
-
-            {[
-              ["Total", "total"],
-              ["VR", "vr"],
-              ["DM", "dm"],
-              ["QR", "qr"],
-              ["AR", "ar"],
-              ["SJT", "sjt"],
-            ].map(([label, key]) => (
-              <div key={key}>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  {label}
-                </label>
-                <input
-                  type="number"
-                  value={ucatForm[key as keyof UcatAttempt] as number}
-                  onChange={(e) =>
-                    setUcatForm((prev) => ({
-                      ...prev,
-                      [key]: Number(e.target.value),
-                    }))
-                  }
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
-                />
-              </div>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={addUcatResult}
-            className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
-          >
-            <Plus className="h-4 w-4" />
-            Save result
-          </button>
-        </Card>
-
-        <Card className="p-6">
-          <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-            Result history
-          </p>
-          <h3 className="mt-2 text-xl font-bold text-slate-950">
-            Your recorded mocks
-          </h3>
-
-          <div className="mt-5 space-y-3">
-            {ucatAttempts.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 p-5 text-sm text-slate-600">
-                No UCAT attempts yet. Add your first mock to start tracking progress.
-              </div>
-            ) : (
-              ucatAttempts.map((attempt) => (
-                <div
-                  key={attempt.id}
-                  className="rounded-2xl border border-slate-200 p-4"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">
-                        {attempt.label || "UCAT Attempt"}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {formatDate(attempt.date)}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-2xl bg-violet-50 px-3 py-2 text-sm font-bold text-violet-700">
-                        {attempt.total}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeUcatResult(attempt.id)}
-                        className="rounded-2xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+            <div className="mt-6 space-y-6">
+              {activeTab === "readiness" && (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <StatCard
+                      label="Overall readiness"
+                      value={`${overallReadiness}`}
+                      hint={getReadinessBand(overallReadiness)}
+                      icon={Target}
+                    />
+                    <StatCard
+                      label="Average UCAT"
+                      value={averageUcat ? `${averageUcat}` : "—"}
+                      hint={latestUcat ? `Latest: ${latestUcat.total}` : "No mocks logged yet"}
+                      icon={Brain}
+                    />
+                    <StatCard
+                      label="Interview average"
+                      value={`${Math.round(interviewAverage)}`}
+                      hint={`${practiceHistory.length} saved attempts`}
+                      icon={Users}
+                    />
+                    <StatCard
+                      label="Story bank"
+                      value={`${stories.length}`}
+                      hint="Examples ready for interviews"
+                      icon={Wand2}
+                    />
                   </div>
 
-                  <div className="mt-4 grid grid-cols-5 gap-2 text-center text-xs sm:text-sm">
-                    {[
-                      ["VR", attempt.vr],
-                      ["DM", attempt.dm],
-                      ["QR", attempt.qr],
-                      ["AR", attempt.ar],
-                      ["SJT", attempt.sjt],
-                    ].map(([name, value]) => (
-                      <div key={name} className="rounded-2xl bg-slate-50 p-3">
-                        <p className="font-medium text-slate-500">{name}</p>
-                        <p className="mt-1 font-bold text-slate-900">{value}</p>
+                  <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                    <Card className="p-6">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-semibold uppercase tracking-wider text-emerald-600">
+                            Composite readiness
+                          </p>
+                          <h2 className="mt-2 text-2xl font-bold text-slate-950">
+                            {getReadinessBand(overallReadiness)}
+                          </h2>
+                          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                            This blends your self-rated academic readiness, UCAT performance,
+                            interview history, application confidence, and story-bank depth.
+                          </p>
+                        </div>
+
+                        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-right">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+                            Current score
+                          </p>
+                          <p className="mt-1 text-3xl font-bold text-emerald-700">
+                            {overallReadiness}
+                          </p>
+                        </div>
                       </div>
-                    ))}
+
+                      <div className="mt-6 space-y-5">
+                        <ProgressBar label="ATAR readiness" value={atarSelfReadiness} tone="blue" />
+                        <ProgressBar label="UCAT readiness" value={ucatReadiness} tone="violet" />
+                        <ProgressBar
+                          label="Interview readiness"
+                          value={interviewAverage}
+                          tone="emerald"
+                        />
+                        <ProgressBar
+                          label="Application readiness"
+                          value={applicationReadiness}
+                          tone="amber"
+                        />
+                        <ProgressBar label="Story bank strength" value={storyBankScore} />
+                      </div>
+                    </Card>
+
+                    <div className="space-y-6">
+                      <Card className="p-6">
+                        <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                          Priority focus
+                        </p>
+                        <h3 className="mt-2 text-xl font-bold text-slate-950">
+                          Improve your {readinessFocus.key}
+                        </h3>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                          This is currently your lowest-scoring pillar, so improving it will lift
+                          your overall readiness fastest.
+                        </p>
+                        <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                          <p className="text-sm font-medium text-slate-700">
+                            Current score:{" "}
+                            <span className="font-bold text-slate-950">
+                              {Math.round(readinessFocus.value)}/100
+                            </span>
+                          </p>
+                        </div>
+                      </Card>
+
+                      <Card className="p-6">
+                        <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                          Adjust confidence inputs
+                        </p>
+
+                        <div className="mt-5 space-y-5">
+                          <div>
+                            <div className="mb-2 flex items-center justify-between">
+                              <label className="text-sm font-medium text-slate-700">
+                                ATAR self-readiness
+                              </label>
+                              <span className="text-sm font-semibold text-slate-900">
+                                {atarSelfReadiness}/100
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              value={atarSelfReadiness}
+                              onChange={(e) => setAtarSelfReadiness(Number(e.target.value))}
+                              className="w-full"
+                            />
+                          </div>
+
+                          <div>
+                            <div className="mb-2 flex items-center justify-between">
+                              <label className="text-sm font-medium text-slate-700">
+                                Application readiness
+                              </label>
+                              <span className="text-sm font-semibold text-slate-900">
+                                {applicationReadiness}/100
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              value={applicationReadiness}
+                              onChange={(e) => setApplicationReadiness(Number(e.target.value))}
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                      </Card>
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
-      </div>
-    </>
-  )}
+                </>
+              )}
 
-  {activeTab === "atar" && (
-    <>
-      <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-        <Card className="p-6">
-          <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-            State system
-          </p>
-          <h3 className="mt-2 text-xl font-bold text-slate-950">
-            ATAR risk management
-          </h3>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            Different states structure scaling and aggregation differently. This is a
-            strategy view, not a predictor.
-          </p>
+              {activeTab === "ucat" && (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <StatCard
+                      label="Latest total"
+                      value={latestUcat ? `${latestUcat.total}` : "—"}
+                      hint={latestUcat ? formatDate(latestUcat.date) : "No attempt added yet"}
+                      icon={Brain}
+                    />
+                    <StatCard
+                      label="Average total"
+                      value={averageUcat ? `${averageUcat}` : "—"}
+                      hint={`${ucatAttempts.length} recorded attempts`}
+                      icon={LineChart}
+                    />
+                    <StatCard
+                      label="Weakest subtest"
+                      value={weakSubtest}
+                      hint="Based on your latest logged mock"
+                      icon={CircleAlert}
+                    />
+                    <StatCard
+                      label="Readiness score"
+                      value={`${ucatReadiness}`}
+                      hint="Converted from your latest total"
+                      icon={Target}
+                    />
+                  </div>
 
-          <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            {(Object.keys(stateConfigs) as StateKey[]).map((key) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setSelectedState(key)}
-                className={cn(
-                  "rounded-2xl border px-4 py-3 text-left transition",
-                  selectedState === key
-                    ? "border-emerald-300 bg-emerald-50"
-                    : "border-slate-200 bg-white hover:bg-slate-50"
-                )}
-              >
-                <p className="font-semibold text-slate-900">{stateConfigs[key].label}</p>
-                <p className="mt-1 text-sm text-slate-500">{stateConfigs[key].short}</p>
-              </button>
-            ))}
-          </div>
+                  <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+                    <Card className="p-6">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                            Add new result
+                          </p>
+                          <h3 className="mt-2 text-xl font-bold text-slate-950">
+                            Log a UCAT mock
+                          </h3>
+                        </div>
 
-          <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
-            <p className="text-sm font-semibold text-slate-900">{stateInfo.label}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{stateInfo.summary}</p>
+                        <div className="rounded-2xl bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700">
+                          Track trends, not one-off highs
+                        </div>
+                      </div>
 
-            <ul className="mt-4 space-y-2">
-              {stateInfo.bullets.map((bullet) => (
-                <li key={bullet} className="flex gap-2 text-sm text-slate-700">
-                  <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />
-                  <span>{bullet}</span>
-                </li>
-              ))}
-            </ul>
+                      <div className="mt-6 grid gap-4 md:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-slate-700">
+                            Date
+                          </label>
+                          <input
+                            type="date"
+                            value={ucatForm.date}
+                            onChange={(e) =>
+                              setUcatForm((prev) => ({ ...prev, date: e.target.value }))
+                            }
+                            className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
+                          />
+                        </div>
 
-            <div className="mt-5 space-y-2">
-              {stateInfo.links.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  <span>{link.label}</span>
-                  <ArrowRight className="h-4 w-4" />
-                </a>
-              ))}
-            </div>
-          </div>
-        </Card>
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-slate-700">
+                            Label
+                          </label>
+                          <input
+                            type="text"
+                            value={ucatForm.label}
+                            onChange={(e) =>
+                              setUcatForm((prev) => ({ ...prev, label: e.target.value }))
+                            }
+                            placeholder="Mock, official, timed practice"
+                            className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
+                          />
+                        </div>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-                Subject mix
-              </p>
-              <h3 className="mt-2 text-xl font-bold text-slate-950">
-                Evaluate your subject profile
-              </h3>
-            </div>
-
-            <button
-              type="button"
-              onClick={addSubject}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              <Plus className="h-4 w-4" />
-              Add subject
-            </button>
-          </div>
-
-          <div className="mt-5 space-y-4">
-            {selectedSubjects.map((subject) => {
-              const impact = getSubjectImpact(selectedState, subject.name);
-
-              return (
-                <div key={subject.id} className="rounded-3xl border border-slate-200 p-4">
-                  <div className="flex flex-wrap items-start gap-3">
-                    <div className="min-w-0 flex-1">
-                      <select
-                        value={subject.name}
-                        onChange={(e) => updateSubject(subject.id, e.target.value)}
-                        className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
-                      >
-                        {subjectOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
+                        {[
+                          ["Total", "total"],
+                          ["VR", "vr"],
+                          ["DM", "dm"],
+                          ["QR", "qr"],
+                          ["AR", "ar"],
+                          ["SJT", "sjt"],
+                        ].map(([label, key]) => (
+                          <div key={key}>
+                            <label className="mb-2 block text-sm font-medium text-slate-700">
+                              {label}
+                            </label>
+                            <input
+                              type="number"
+                              value={ucatForm[key as keyof UcatAttempt] as number}
+                              onChange={(e) =>
+                                setUcatForm((prev) => ({
+                                  ...prev,
+                                  [key]: Number(e.target.value),
+                                }))
+                              }
+                              className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
+                            />
+                          </div>
                         ))}
-                      </select>
-                    </div>
+                      </div>
 
-                    {selectedSubjects.length > 1 && (
                       <button
                         type="button"
-                        onClick={() => removeSubject(subject.id)}
-                        className="rounded-2xl border border-slate-200 p-3 text-slate-500 hover:bg-slate-50"
+                        onClick={addUcatResult}
+                        className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Plus className="h-4 w-4" />
+                        Save result
                       </button>
-                    )}
-                  </div>
+                    </Card>
 
-                  <div className="mt-4 rounded-2xl bg-slate-50 p-4">
-                    <div className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-                      {impact.tag}
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{impact.text}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      </div>
-    </>
-  )}
+                    <Card className="p-6">
+                      <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                        Result history
+                      </p>
+                      <h3 className="mt-2 text-xl font-bold text-slate-950">
+                        Your recorded mocks
+                      </h3>
 
-              {activeTab === "interview" && (
+                      <div className="mt-5 space-y-3">
+                        {ucatAttempts.length === 0 ? (
+                          <div className="rounded-2xl border border-dashed border-slate-300 p-5 text-sm text-slate-600">
+                            No UCAT attempts yet. Add your first mock to start tracking progress.
+                          </div>
+                        ) : (
+                          ucatAttempts.map((attempt) => (
+                            <div
+                              key={attempt.id}
+                              className="rounded-2xl border border-slate-200 p-4"
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-4">
+                                <div>
+                                  <p className="text-sm font-semibold text-slate-900">
+                                    {attempt.label || "UCAT Attempt"}
+                                  </p>
+                                  <p className="mt-1 text-sm text-slate-500">
+                                    {formatDate(attempt.date)}
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                  <div className="rounded-2xl bg-violet-50 px-3 py-2 text-sm font-bold text-violet-700">
+                                    {attempt.total}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeUcatResult(attempt.id)}
+                                    className="rounded-2xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="mt-4 grid grid-cols-5 gap-2 text-center text-xs sm:text-sm">
+                                {[
+                                  ["VR", attempt.vr],
+                                  ["DM", attempt.dm],
+                                  ["QR", attempt.qr],
+                                  ["AR", attempt.ar],
+                                  ["SJT", attempt.sjt],
+                                ].map(([name, value]) => (
+                                  <div key={name} className="rounded-2xl bg-slate-50 p-3">
+                                    <p className="font-medium text-slate-500">{name}</p>
+                                    <p className="mt-1 font-bold text-slate-900">{value}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </Card>
+                  </div>
+                </>
+              )}
+
+              {activeTab === "atar" && (
+                <>
+                  <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+                    <Card className="p-6">
+                      <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                        State system
+                      </p>
+                      <h3 className="mt-2 text-xl font-bold text-slate-950">
+                        ATAR risk management
+                      </h3>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                        Different states structure scaling and aggregation differently. This is a
+                        strategy view, not a predictor.
+                      </p>
+
+                      <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                        {(Object.keys(stateConfigs) as StateKey[]).map((key) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setSelectedState(key)}
+                            className={cn(
+                              "rounded-2xl border px-4 py-3 text-left transition",
+                              selectedState === key
+                                ? "border-emerald-300 bg-emerald-50"
+                                : "border-slate-200 bg-white hover:bg-slate-50"
+                            )}
+                          >
+                            <p className="font-semibold text-slate-900">
+                              {stateConfigs[key].label}
+                            </p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {stateConfigs[key].short}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                        <p className="text-sm font-semibold text-slate-900">
+                          {stateInfo.label}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                          {stateInfo.summary}
+                        </p>
+
+                        <ul className="mt-4 space-y-2">
+                          {stateInfo.bullets.map((bullet) => (
+                            <li key={bullet} className="flex gap-2 text-sm text-slate-700">
+                              <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />
+                              <span>{bullet}</span>
+                            </li>
+                          ))}
+                        </ul>
+
+                        <div className="mt-5 space-y-2">
+                          {stateInfo.links.map((link) => (
+                            <a
+                              key={link.href}
+                              href={link.href}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            >
+                              <span>{link.label}</span>
+                              <ArrowRight className="h-4 w-4" />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    </Card>
+
+                    <Card className="p-6">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                            Subject mix
+                          </p>
+                          <h3 className="mt-2 text-xl font-bold text-slate-950">
+                            Evaluate your subject profile
+                          </h3>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={addSubject}
+                          className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Add subject
+                        </button>
+                      </div>
+
+                      <div className="mt-5 space-y-4">
+                        {selectedSubjects.map((subject) => {
+                          const impact = getSubjectImpact(selectedState, subject.name);
+
+                          return (
+                            <div key={subject.id} className="rounded-3xl border border-slate-200 p-4">
+                              <div className="flex flex-wrap items-start gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <select
+                                    value={subject.name}
+                                    onChange={(e) => updateSubject(subject.id, e.target.value)}
+                                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
+                                  >
+                                    {subjectOptions.map((option) => (
+                                      <option key={option} value={option}>
+                                        {option}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                {selectedSubjects.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSubject(subject.id)}
+                                    className="rounded-2xl border border-slate-200 p-3 text-slate-500 hover:bg-slate-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                                <div className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                                  {impact.tag}
+                                </div>
+                                <p className="mt-2 text-sm leading-6 text-slate-600">
+                                  {impact.text}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </Card>
+                  </div>
+                </>
+              )}
+                            {activeTab === "interview" && (
                 <>
                   <div className="flex flex-wrap gap-3">
                     <button
@@ -1956,6 +2316,18 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                       )}
                     >
                       Practice
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInterviewTab("arena")}
+                      className={cn(
+                        "rounded-full px-4 py-2 text-sm font-semibold transition",
+                        interviewTab === "arena"
+                          ? "bg-slate-900 text-white"
+                          : "border border-slate-200 bg-white text-slate-700"
+                      )}
+                    >
+                      Interview Arena
                     </button>
                     <button
                       type="button"
@@ -2024,8 +2396,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                   Interview studio
                                 </h3>
                                 <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
-                                  Start a timed station, draft your answer, then save a scored attempt so
-                                  you can actually track progress over time.
+                                  Start a timed station, draft your answer, then save a
+                                  scored attempt so you can actually track progress over
+                                  time.
                                 </p>
                               </div>
 
@@ -2077,7 +2450,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                               </button>
                             </div>
 
-                            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+                            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
                               <div className="flex flex-wrap items-center justify-between gap-3">
                                 <div>
                                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -2113,7 +2486,10 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                   <div
                                     className="h-2 rounded-full bg-linear-to-r from-emerald-500 via-sky-500 to-violet-500 transition-all"
                                     style={{
-                                      width: `${Math.max(0, Math.min(100, sessionProgress))}%`,
+                                      width: `${Math.max(
+                                        0,
+                                        Math.min(100, sessionProgress)
+                                      )}%`,
                                     }}
                                   />
                                 </div>
@@ -2122,7 +2498,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                               {interviewMode === "MMI" && currentPrompt && (
                                 <div className="mt-5 rounded-3xl border border-emerald-200 bg-white p-5">
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <SoftBadge tone="emerald">{currentPrompt.theme}</SoftBadge>
+                                    <SoftBadge tone="emerald">
+                                      {currentPrompt.theme}
+                                    </SoftBadge>
                                     <SoftBadge tone="slate">MMI station</SoftBadge>
                                   </div>
 
@@ -2163,7 +2541,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                               {interviewMode === "Panel" && currentPanelPrompt && (
                                 <div className="mt-5 rounded-3xl border border-blue-200 bg-white p-5">
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <SoftBadge tone="blue">{currentPanelPrompt.theme}</SoftBadge>
+                                    <SoftBadge tone="blue">
+                                      {currentPanelPrompt.theme}
+                                    </SoftBadge>
                                     <SoftBadge tone="slate">Panel question</SoftBadge>
                                   </div>
 
@@ -2184,7 +2564,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                                         Voice interviewer
                                       </p>
-                                      <h3 className="mt-1 text-xl font-semibold text-white">Pulse</h3>
+                                      <h3 className="mt-1 text-xl font-semibold text-white">
+                                        Pulse
+                                      </h3>
                                       <p className="mt-1 text-sm text-slate-300">
                                         {interviewMode === "MMI"
                                           ? "Pulse reads the MMI station aloud."
@@ -2192,7 +2574,10 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                       </p>
                                     </div>
 
-                                    <PulseOrb mode={pulseMode} enabled={voiceModeEnabled} />
+                                    <PulseOrb
+                                      mode={pulseMode}
+                                      enabled={voiceModeEnabled}
+                                    />
                                   </div>
 
                                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -2203,7 +2588,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                       <input
                                         type="checkbox"
                                         checked={voiceModeEnabled}
-                                        onChange={(e) => setVoiceModeEnabled(e.target.checked)}
+                                        onChange={(e) =>
+                                          setVoiceModeEnabled(e.target.checked)
+                                        }
                                       />
                                     </label>
 
@@ -2214,7 +2601,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                       <input
                                         type="checkbox"
                                         checked={autoPlayQuestion}
-                                        onChange={(e) => setAutoPlayQuestion(e.target.checked)}
+                                        onChange={(e) =>
+                                          setAutoPlayQuestion(e.target.checked)
+                                        }
                                       />
                                     </label>
                                   </div>
@@ -2223,7 +2612,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                     <button
                                       type="button"
                                       onClick={() => void speakCurrentQuestion()}
-                                      disabled={!voiceModeEnabled || !currentQuestionText}
+                                      disabled={
+                                        !voiceModeEnabled || !currentQuestionText
+                                      }
                                       className="rounded-full border border-slate-600 px-4 py-2 text-sm font-medium text-slate-100 disabled:opacity-50"
                                     >
                                       Replay question
@@ -2241,7 +2632,8 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                     No station loaded yet
                                   </p>
                                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                                    Generate a new prompt to start a proper interview practice session.
+                                    Generate a new prompt to start a proper interview
+                                    practice session.
                                   </p>
                                 </div>
                               )}
@@ -2260,16 +2652,20 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                   Build your answer live
                                 </h3>
                                 <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
-                                  Write or dictate your answer, then save the station and turn it into
-                                  a scored attempt.
+                                  Write or dictate your answer, then save the
+                                  station and turn it into a scored attempt.
                                 </p>
                               </div>
 
                               <div className="flex flex-wrap gap-2">
-                                <SoftBadge tone={responseWords >= 160 ? "emerald" : "amber"}>
+                                <SoftBadge
+                                  tone={responseWords >= 160 ? "emerald" : "amber"}
+                                >
                                   {responseEnergyLabel(responseWords)}
                                 </SoftBadge>
-                                <SoftBadge tone={isEvaluating ? "violet" : "slate"}>
+                                <SoftBadge
+                                  tone={isEvaluating ? "violet" : "slate"}
+                                >
                                   {isEvaluating ? "Evaluating" : "Ready"}
                                 </SoftBadge>
                               </div>
@@ -2337,12 +2733,12 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                               </button>
                             </div>
 
-                            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-3">
+                            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3">
                               <textarea
                                 value={currentResponse}
                                 onChange={(e) => setCurrentResponse(e.target.value)}
                                 placeholder="Write or dictate your response here..."
-                                className="min-h-80 w-full rounded-[22px] border border-slate-200 bg-white px-4 py-4 text-sm leading-7 outline-none focus:border-slate-400"
+                                className="min-h-80 w-full rounded-3xl border border-slate-200 bg-white px-4 py-4 text-sm leading-7 outline-none focus:border-slate-400"
                               />
                             </div>
 
@@ -2357,7 +2753,8 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                   {isEvaluating
                                     ? "Evaluating..."
                                     : currentPrompt &&
-                                        currentQuestionIndex === currentPrompt.questions.length - 1
+                                        currentQuestionIndex ===
+                                          currentPrompt.questions.length - 1
                                       ? "Finish and evaluate"
                                       : "Save and next"}
                                   <ChevronRight className="h-4 w-4" />
@@ -2369,7 +2766,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                   onClick={submitPanelAttempt}
                                   className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
                                 >
-                                  {isEvaluating ? "Evaluating..." : "Submit and evaluate"}
+                                  {isEvaluating
+                                    ? "Evaluating..."
+                                    : "Submit and evaluate"}
                                   <ChevronRight className="h-4 w-4" />
                                 </button>
                               )}
@@ -2384,7 +2783,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                             </div>
 
                             {latestFeedback && (
-                              <div className="rounded-[28px] border border-emerald-200 bg-emerald-50/70 p-5">
+                              <div className="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-5">
                                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                   <div>
                                     <p className="text-sm font-semibold uppercase tracking-wider text-emerald-700">
@@ -2410,9 +2809,15 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
 
                                 <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
                                   <ScoreChip label="Clarity" value={latestFeedback.clarity} />
-                                  <ScoreChip label="Reasoning" value={latestFeedback.reasoning} />
+                                  <ScoreChip
+                                    label="Reasoning"
+                                    value={latestFeedback.reasoning}
+                                  />
                                   <ScoreChip label="Empathy" value={latestFeedback.empathy} />
-                                  <ScoreChip label="Structure" value={latestFeedback.structure} />
+                                  <ScoreChip
+                                    label="Structure"
+                                    value={latestFeedback.structure}
+                                  />
                                   <ScoreChip
                                     label="Professionalism"
                                     value={latestFeedback.professionalism}
@@ -2427,7 +2832,10 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                     </p>
                                     <ul className="mt-3 space-y-2">
                                       {latestFeedback.improvements.map((item) => (
-                                        <li key={item} className="flex gap-2 text-sm text-slate-700">
+                                        <li
+                                          key={item}
+                                          className="flex gap-2 text-sm text-slate-700"
+                                        >
                                           <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />
                                           <span>{item}</span>
                                         </li>
@@ -2437,6 +2845,539 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                 )}
                               </div>
                             )}
+                          </div>
+                        </StudioPanel>
+                      </div>
+                    </div>
+                  )}
+
+                  {interviewTab === "arena" && (
+                    <div className="space-y-6">
+                      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        <PracticeMetricTile
+                          label="Vitals"
+                          value={`${arenaVitals}`}
+                          sub={`+${arenaToday} today`}
+                          tone="violet"
+                        />
+                        <PracticeMetricTile
+                          label="Momentum"
+                          value={getMomentumLabel(arenaMomentum)}
+                          sub={`${arenaActiveDays}/7 active days`}
+                          tone="emerald"
+                        />
+                        <PracticeMetricTile
+                          label="Arena level"
+                          value={`Lv ${arenaApplicantLevel}`}
+                          sub={arenaApplicantLevelLabel}
+                          tone="blue"
+                        />
+                        <PracticeMetricTile
+                          label="Unlocked bosses"
+                          value={`${
+                            unlockedBosses.filter((item) => item.unlocked).length
+                          }/${ARENA_BOSSES.length}`}
+                          sub="Boss progression"
+                          tone="amber"
+                        />
+                      </div>
+
+                      <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+                        <StudioPanel>
+                          <div className="flex flex-col gap-6">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                                  Interview Arena
+                                </p>
+                                <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
+                                  Boss ladder
+                                </h3>
+                                <p className="mt-2 text-sm leading-6 text-slate-600">
+                                  Beat bosses to prove your interview readiness.
+                                  Stronger bosses demand more Vitals and better
+                                  momentum.
+                                </p>
+                              </div>
+
+                              <div className="flex flex-wrap gap-2">
+                                <SoftBadge tone="violet">
+                                  {arenaVitals} Vitals
+                                </SoftBadge>
+                                <SoftBadge tone="emerald">
+                                  {getMomentumLabel(arenaMomentum)}
+                                </SoftBadge>
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              {unlockedBosses.map(({ boss, unlocked }) => {
+                                const active = arenaSelectedBossId === boss.id;
+
+                                return (
+                                  <button
+                                    key={boss.id}
+                                    type="button"
+                                    onClick={() => setArenaSelectedBossId(boss.id)}
+                                    className={cn(
+                                      "w-full rounded-3xl border p-4 text-left transition",
+                                      active
+                                        ? "border-violet-300 bg-violet-50"
+                                        : "border-slate-200 bg-white hover:bg-slate-50"
+                                    )}
+                                  >
+                                    <div className="flex items-start justify-between gap-4">
+                                      <div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <span className="text-sm font-semibold text-slate-900">
+                                            Level {boss.level}
+                                          </span>
+                                          <SoftBadge tone={unlocked ? "emerald" : "rose"}>
+                                            {unlocked ? "Unlocked" : "Locked"}
+                                          </SoftBadge>
+                                        </div>
+                                        <p className="mt-2 text-lg font-bold text-slate-950">
+                                          {boss.title}
+                                        </p>
+                                        <p className="mt-1 text-sm text-slate-500">
+                                          {boss.name}
+                                        </p>
+                                      </div>
+
+                                      <div className="text-right">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                                          Reward
+                                        </p>
+                                        <p className="mt-1 text-sm font-bold text-violet-700">
+                                          +{boss.rewardVitals} Vitals
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <div className="mt-3 text-sm leading-6 text-slate-600">
+                                      {boss.roleplayIntro}
+                                    </div>
+
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                      <SoftBadge tone="blue">
+                                        {boss.mode.toUpperCase()}
+                                      </SoftBadge>
+                                      <SoftBadge tone="slate">
+                                        {boss.difficultyLabel}
+                                      </SoftBadge>
+                                      <SoftBadge tone="amber">
+                                        Unlock at {boss.unlockVitals} Vitals
+                                      </SoftBadge>
+                                      {boss.requiresMomentum ? (
+                                        <SoftBadge tone="violet">
+                                          Need {getMomentumLabel(boss.requiresMomentum)}
+                                        </SoftBadge>
+                                      ) : null}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </StudioPanel>
+
+                        <StudioPanel>
+                          <div className="flex flex-col gap-6">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                                  Selected boss
+                                </p>
+                                <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
+                                  {selectedArenaBoss.title}
+                                </h3>
+                                <p className="mt-2 text-sm leading-6 text-slate-600">
+                                  {selectedArenaBoss.name} ·{" "}
+                                  {selectedArenaBoss.difficultyLabel}
+                                </p>
+                              </div>
+
+                              <div className="flex flex-wrap gap-2">
+                                <SoftBadge tone="violet">
+                                  Reward +{selectedArenaBoss.rewardVitals}
+                                </SoftBadge>
+                                <SoftBadge tone="blue">
+                                  {selectedArenaBoss.mode.toUpperCase()}
+                                </SoftBadge>
+                              </div>
+                            </div>
+
+                            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                              <p className="text-sm leading-7 text-slate-700">
+                                {selectedArenaBoss.roleplayIntro}
+                              </p>
+
+                              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                    Unlock requirement
+                                  </p>
+                                  <p className="mt-2 text-sm font-semibold text-slate-900">
+                                    {selectedArenaBoss.unlockVitals} Vitals
+                                    {selectedArenaBoss.requiresMomentum
+                                      ? ` + ${getMomentumLabel(
+                                          selectedArenaBoss.requiresMomentum
+                                        )}`
+                                      : ""}
+                                  </p>
+                                </div>
+
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                    Structure
+                                  </p>
+                                  <p className="mt-2 text-sm font-semibold text-slate-900">
+                                    {selectedArenaBoss.questionCount} questions ·{" "}
+                                    {Math.round(
+                                      selectedArenaBoss.timeLimitSeconds / 60
+                                    )}{" "}
+                                    min
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="rounded-3xl border border-slate-200 bg-linear-to-b from-slate-950 via-slate-900 to-slate-950 p-5 text-white shadow-sm">
+                              <div className="flex items-center justify-between gap-4">
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                    Voice boss
+                                  </p>
+                                  <h3 className="mt-1 text-xl font-semibold text-white">
+                                    Pulse
+                                  </h3>
+                                  <p className="mt-1 text-sm text-slate-300">
+                                    Pulse reads the boss intro and current arena
+                                    question in character.
+                                  </p>
+                                </div>
+
+                                <PulseOrb mode={pulseMode} enabled={voiceModeEnabled} />
+                              </div>
+
+                              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                                <label className="flex items-center justify-between rounded-2xl border border-slate-700 px-4 py-3">
+                                  <span className="text-sm font-medium text-slate-200">
+                                    Voice mode
+                                  </span>
+                                  <input
+                                    type="checkbox"
+                                    checked={voiceModeEnabled}
+                                    onChange={(e) =>
+                                      setVoiceModeEnabled(e.target.checked)
+                                    }
+                                  />
+                                </label>
+
+                                <label className="flex items-center justify-between rounded-2xl border border-slate-700 px-4 py-3">
+                                  <span className="text-sm font-medium text-slate-200">
+                                    Auto-play question
+                                  </span>
+                                  <input
+                                    type="checkbox"
+                                    checked={autoPlayQuestion}
+                                    onChange={(e) =>
+                                      setAutoPlayQuestion(e.target.checked)
+                                    }
+                                  />
+                                </label>
+                              </div>
+
+                              <div className="mt-4 flex flex-wrap gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => void speakCurrentQuestion()}
+                                  disabled={!voiceModeEnabled || !currentQuestionText}
+                                  className="rounded-full border border-slate-600 px-4 py-2 text-sm font-medium text-slate-100 disabled:opacity-50"
+                                >
+                                  Replay boss audio
+                                </button>
+                              </div>
+                            </div>
+
+                            {!arenaSession ? (
+                              <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
+                                  <Shield className="h-5 w-5" />
+                                </div>
+                                <p className="mt-4 text-lg font-semibold text-slate-900">
+                                  No arena run active
+                                </p>
+                                <p className="mt-2 text-sm leading-6 text-slate-600">
+                                  Start this boss to generate a real interview
+                                  battle with timed questioning, Pulse voice,
+                                  scoring, feedback, and pass or fail.
+                                </p>
+
+                                <div className="mt-5 flex flex-wrap justify-center gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={startArenaRun}
+                                    disabled={
+                                      isStartingArena ||
+                                      !isBossUnlocked({
+                                        boss: selectedArenaBoss,
+                                        vitalsTotal: arenaVitals,
+                                        momentumState: arenaMomentum,
+                                      })
+                                    }
+                                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                                  >
+                                    <Crown className="h-4 w-4" />
+                                    {isStartingArena
+                                      ? "Starting..."
+                                      : "Enter Arena"}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-5">
+                                <div className="rounded-3xl border border-violet-200 bg-violet-50 p-5">
+                                  <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">
+                                        Arena run active
+                                      </p>
+                                      <h4 className="mt-2 text-xl font-black tracking-tight text-slate-950">
+                                        {arenaSession.boss.title}
+                                      </h4>
+                                    </div>
+
+                                    <div className="text-right">
+                                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                        Timer
+                                      </p>
+                                      <p className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                                        {formatTime(timerSeconds)}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-4 rounded-2xl border border-violet-200 bg-white p-4">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">
+                                      Boss intro
+                                    </p>
+                                    <p className="mt-2 text-sm leading-7 text-slate-700">
+                                      {arenaSession.introScript}
+                                    </p>
+                                  </div>
+
+                                  {arenaCurrentQuestion ? (
+                                    <div className="mt-4 rounded-2xl border border-violet-200 bg-white p-4">
+                                      <div className="flex items-center justify-between gap-3">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">
+                                          Question {arenaQuestionIndex + 1} of{" "}
+                                          {arenaSession.questions.length}
+                                        </p>
+                                        <SoftBadge tone="blue">
+                                          {arenaCurrentQuestion.theme}
+                                        </SoftBadge>
+                                      </div>
+
+                                      <p className="mt-2 text-base font-semibold leading-7 text-slate-900">
+                                        {arenaCurrentQuestion.prompt}
+                                      </p>
+
+                                      {arenaCurrentQuestion.followUps.length > 0 ? (
+                                        <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                            Likely follow-ups
+                                          </p>
+                                          <ul className="mt-3 space-y-2">
+                                            {arenaCurrentQuestion.followUps.map((followUp) => (
+                                              <li
+                                                key={followUp}
+                                                className="flex gap-2 text-sm text-slate-700"
+                                              >
+                                                <span className="mt-1 h-2 w-2 rounded-full bg-violet-500" />
+                                                <span>{followUp}</span>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+                                </div>
+
+                                <div className="grid gap-3 sm:grid-cols-3">
+                                  <PracticeMetricTile
+                                    label="Word count"
+                                    value={`${arenaWords}`}
+                                    sub={responseEnergyLabel(arenaWords)}
+                                    tone={arenaWords >= 160 ? "emerald" : "amber"}
+                                  />
+                                  <PracticeMetricTile
+                                    label="Characters"
+                                    value={`${arenaCharacters}`}
+                                    sub="Current arena answer"
+                                    tone="blue"
+                                  />
+                                  <PracticeMetricTile
+                                    label="Voice input"
+                                    value={scribe.isConnected ? "Listening" : "Ready"}
+                                    sub={
+                                      scribe.isConnected
+                                        ? "Live transcript running"
+                                        : "Press start voice"
+                                    }
+                                    tone={scribe.isConnected ? "rose" : "violet"}
+                                  />
+                                </div>
+
+                                <div className="flex flex-wrap gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => void startVoiceAnswer()}
+                                    disabled={scribe.isConnected}
+                                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                                  >
+                                    <Mic2 className="h-4 w-4" />
+                                    Start voice
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={stopVoiceAnswer}
+                                    disabled={!scribe.isConnected}
+                                    className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50"
+                                  >
+                                    Stop voice
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={clearVoiceTranscript}
+                                    className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+                                  >
+                                    Clear transcript
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={resetArenaDraft}
+                                    className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+                                  >
+                                    Reset arena draft
+                                  </button>
+                                </div>
+
+                                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3">
+                                  <textarea
+                                    value={arenaResponse}
+                                    onChange={(e) => setArenaResponse(e.target.value)}
+                                    placeholder="Write or dictate your Interview Arena answer here..."
+                                    className="min-h-80 w-full rounded-3xl border border-slate-200 bg-white px-4 py-4 text-sm leading-7 outline-none focus:border-slate-400"
+                                  />
+                                </div>
+
+                                <div className="flex flex-wrap gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={submitArenaRun}
+                                    disabled={isSubmittingArena || !arenaResponse.trim()}
+                                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                                  >
+                                    {isSubmittingArena
+                                      ? "Submitting..."
+                                      : "Submit arena run"}
+                                    <ChevronRight className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {arenaResult ? (
+                              <div
+                                className={cn(
+                                  "rounded-3xl border p-5",
+                                  arenaResult.pass
+                                    ? "border-emerald-200 bg-emerald-50"
+                                    : "border-rose-200 bg-rose-50"
+                                )}
+                              >
+                                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                  <div>
+                                    <p
+                                      className={cn(
+                                        "text-sm font-semibold uppercase tracking-wider",
+                                        arenaResult.pass
+                                          ? "text-emerald-700"
+                                          : "text-rose-700"
+                                      )}
+                                    >
+                                      {arenaResult.pass ? "Boss defeated" : "Boss not cleared"}
+                                    </p>
+                                    <h4 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
+                                      {arenaResult.pass
+                                        ? `You passed ${arenaResult.boss.title}`
+                                        : `You did not pass ${arenaResult.boss.title}`}
+                                    </h4>
+                                    <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-700">
+                                      {arenaResult.feedback}
+                                    </p>
+                                  </div>
+
+                                  <div className="rounded-3xl border border-white/70 bg-white px-4 py-3 text-right">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                      Vitals awarded
+                                    </p>
+                                    <p className="mt-1 text-3xl font-black tracking-tight text-violet-700">
+                                      +{arenaResult.vitalsAwarded}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                                  <ScoreChip
+                                    label="Clarity"
+                                    value={arenaResult.breakdown.clarity / 20}
+                                  />
+                                  <ScoreChip
+                                    label="Reasoning"
+                                    value={arenaResult.breakdown.reasoning / 20}
+                                  />
+                                  <ScoreChip
+                                    label="Empathy"
+                                    value={arenaResult.breakdown.empathy / 20}
+                                  />
+                                  <ScoreChip
+                                    label="Structure"
+                                    value={arenaResult.breakdown.structure / 20}
+                                  />
+                                  <ScoreChip
+                                    label="Professionalism"
+                                    value={arenaResult.breakdown.professionalism / 20}
+                                  />
+                                  <ScoreChip
+                                    label="Overall"
+                                    value={arenaResult.breakdown.overall / 100}
+                                  />
+                                </div>
+
+                                {arenaResult.pass &&
+                                arenaResult.boss.level === 5 ? (
+                                  <div className="mt-5 rounded-2xl border border-emerald-200 bg-white p-4">
+                                    <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                                      Champion cleared
+                                    </p>
+                                    <p className="mt-2 text-lg font-bold text-slate-950">
+                                      You are ready for interviews.
+                                    </p>
+                                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                                      You beat the final boss. Keep refining,
+                                      but this is the level of composure and
+                                      structure you want entering real interviews.
+                                    </p>
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </div>
                         </StudioPanel>
                       </div>
@@ -2453,8 +3394,8 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                           Save your best examples
                         </h3>
                         <p className="mt-2 text-sm leading-6 text-slate-600">
-                          Build a library of leadership, teamwork, resilience, empathy, and ethics
-                          examples you can adapt in interviews.
+                          Build a library of leadership, teamwork, resilience,
+                          empathy, and ethics examples you can adapt in interviews.
                         </p>
 
                         <div className="mt-5 space-y-4">
@@ -2462,7 +3403,10 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                             type="text"
                             value={storyForm.title}
                             onChange={(e) =>
-                              setStoryForm((prev) => ({ ...prev, title: e.target.value }))
+                              setStoryForm((prev) => ({
+                                ...prev,
+                                title: e.target.value,
+                              }))
                             }
                             placeholder="Story title"
                             className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
@@ -2472,7 +3416,10 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                             type="text"
                             value={storyForm.category}
                             onChange={(e) =>
-                              setStoryForm((prev) => ({ ...prev, category: e.target.value }))
+                              setStoryForm((prev) => ({
+                                ...prev,
+                                category: e.target.value,
+                              }))
                             }
                             placeholder="Category"
                             className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
@@ -2481,7 +3428,10 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                           <textarea
                             value={storyForm.situation}
                             onChange={(e) =>
-                              setStoryForm((prev) => ({ ...prev, situation: e.target.value }))
+                              setStoryForm((prev) => ({
+                                ...prev,
+                                situation: e.target.value,
+                              }))
                             }
                             placeholder="Situation"
                             className="min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
@@ -2490,7 +3440,10 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                           <textarea
                             value={storyForm.action}
                             onChange={(e) =>
-                              setStoryForm((prev) => ({ ...prev, action: e.target.value }))
+                              setStoryForm((prev) => ({
+                                ...prev,
+                                action: e.target.value,
+                              }))
                             }
                             placeholder="Action"
                             className="min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
@@ -2499,7 +3452,10 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                           <textarea
                             value={storyForm.result}
                             onChange={(e) =>
-                              setStoryForm((prev) => ({ ...prev, result: e.target.value }))
+                              setStoryForm((prev) => ({
+                                ...prev,
+                                result: e.target.value,
+                              }))
                             }
                             placeholder="Result"
                             className="min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
@@ -2509,7 +3465,10 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                             type="text"
                             value={storyForm.tags}
                             onChange={(e) =>
-                              setStoryForm((prev) => ({ ...prev, tags: e.target.value }))
+                              setStoryForm((prev) => ({
+                                ...prev,
+                                tags: e.target.value,
+                              }))
                             }
                             placeholder="Tags, comma separated"
                             className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
@@ -2537,22 +3496,31 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                             </h3>
                           </div>
 
-                          <SoftBadge tone="violet">{stories.length} saved</SoftBadge>
+                          <SoftBadge tone="violet">
+                            {stories.length} saved
+                          </SoftBadge>
                         </div>
 
                         <div className="mt-5 space-y-4">
                           {stories.length === 0 ? (
                             <div className="rounded-2xl border border-dashed border-slate-300 p-5 text-sm text-slate-600">
-                              No stories saved yet. Start building examples for teamwork,
-                              leadership, empathy, conflict, and resilience.
+                              No stories saved yet. Start building examples for
+                              teamwork, leadership, empathy, conflict, and resilience.
                             </div>
                           ) : (
                             stories.map((story) => (
-                              <div key={story.id} className="rounded-3xl border border-slate-200 p-5">
+                              <div
+                                key={story.id}
+                                className="rounded-3xl border border-slate-200 p-5"
+                              >
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
-                                    <p className="text-lg font-bold text-slate-950">{story.title}</p>
-                                    <p className="mt-1 text-sm text-slate-500">{story.category}</p>
+                                    <p className="text-lg font-bold text-slate-950">
+                                      {story.title}
+                                    </p>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                      {story.category}
+                                    </p>
                                   </div>
                                   {story.tags && (
                                     <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -2601,7 +3569,11 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                         <StatCard
                           label="Saved attempts"
                           value={`${practiceHistory.length}`}
-                          hint={isLoadingPractice ? "Loading history..." : "Across all interview modes"}
+                          hint={
+                            isLoadingPractice
+                              ? "Loading history..."
+                              : "Across all interview modes"
+                          }
                           icon={Users}
                         />
                         <StatCard
@@ -2641,7 +3613,10 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                           </div>
 
                           <div className="mt-6 space-y-5">
-                            <ProgressBar label="Clarity" value={progressAverages.clarity * 20} />
+                            <ProgressBar
+                              label="Clarity"
+                              value={progressAverages.clarity * 20}
+                            />
                             <ProgressBar
                               label="Reasoning"
                               value={progressAverages.reasoning * 20}
@@ -2705,19 +3680,28 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                               </div>
                             ) : practiceHistory.length === 0 ? (
                               <div className="rounded-2xl border border-dashed border-slate-300 p-5 text-sm text-slate-600">
-                                No saved interview attempts yet. Complete a practice submission to
-                                build your progress history.
+                                No saved interview attempts yet. Complete a
+                                practice submission to build your progress history.
                               </div>
                             ) : (
                               practiceHistory.map((attempt) => (
-                                <div key={attempt.id} className="rounded-3xl border border-slate-200 p-5">
+                                <div
+                                  key={attempt.id}
+                                  className="rounded-3xl border border-slate-200 p-5"
+                                >
                                   <div className="flex flex-wrap items-start justify-between gap-4">
                                     <div>
                                       <div className="flex flex-wrap items-center gap-2">
                                         <p className="text-sm font-semibold text-slate-900">
                                           {attempt.title}
                                         </p>
-                                        <SoftBadge tone={attempt.mode === "MMI" ? "emerald" : "blue"}>
+                                        <SoftBadge
+                                          tone={
+                                            attempt.mode === "MMI"
+                                              ? "emerald"
+                                              : "blue"
+                                          }
+                                        >
                                           {attempt.mode}
                                         </SoftBadge>
                                       </div>
@@ -2732,7 +3716,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                       </div>
                                       <button
                                         type="button"
-                                        onClick={() => deletePracticeAttempt(attempt.id)}
+                                        onClick={() =>
+                                          deletePracticeAttempt(attempt.id)
+                                        }
                                         className="rounded-2xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
                                       >
                                         <Trash2 className="h-4 w-4" />
@@ -2751,7 +3737,10 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                       </p>
                                       <ul className="mt-3 space-y-2">
                                         {attempt.improvements.map((item) => (
-                                          <li key={item} className="flex gap-2 text-sm text-slate-700">
+                                          <li
+                                            key={item}
+                                            className="flex gap-2 text-sm text-slate-700"
+                                          >
                                             <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />
                                             <span>{item}</span>
                                           </li>
@@ -2769,8 +3758,13 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                       ["Professionalism", attempt.professionalism],
                                       ["Overall", attempt.overall],
                                     ].map(([label, value]) => (
-                                      <div key={label} className="rounded-2xl bg-slate-50 p-3 text-center">
-                                        <p className="text-xs font-medium text-slate-500">{label}</p>
+                                      <div
+                                        key={label}
+                                        className="rounded-2xl bg-slate-50 p-3 text-center"
+                                      >
+                                        <p className="text-xs font-medium text-slate-500">
+                                          {label}
+                                        </p>
                                         <p className="mt-1 text-sm font-bold text-slate-900">
                                           {Math.round(Number(value) * 20)}
                                         </p>
