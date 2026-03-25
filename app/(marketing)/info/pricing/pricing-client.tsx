@@ -4,7 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Check, Crown, HelpCircle, ShieldCheck, Zap } from "lucide-react";
+import {
+  Check,
+  Crown,
+  HelpCircle,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  Zap,
+} from "lucide-react";
 import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 
 type CurrentPlan = "free" | "pro_monthly" | "pro_annual";
@@ -15,13 +23,16 @@ type Plan = {
   price: string;
   suffix: string;
   badge?: string;
-  tone: string;
-  buttonTone: string;
+  planKey?: "pro_monthly" | "pro_annual";
   cta: string;
   href?: string;
-  planKey?: "pro_monthly" | "pro_annual";
+  valueLabel: string;
+  savingsLine?: string;
+  commitmentLine?: string;
+  tone: "free" | "monthly" | "annual";
   features: string[];
   note?: string;
+  annualBonus?: string[];
 };
 
 const CONSENT_VERSION = "2026-03-14";
@@ -29,14 +40,13 @@ const CONSENT_VERSION = "2026-03-14";
 const plans: Plan[] = [
   {
     name: "Free",
-    subtitle: "Perfect to explore and plan",
+    subtitle: "Explore the platform before committing.",
     price: "$0",
     suffix: "/forever",
-    tone: "border-slate-200 bg-white",
-    buttonTone:
-      "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100",
-    cta: "Current Plan",
+    cta: "Stay on Free",
     href: "/",
+    valueLabel: "Best for early exploration",
+    tone: "free",
     features: [
       "Home dashboard",
       "Student Classification Guide",
@@ -45,20 +55,24 @@ const plans: Plan[] = [
       "University Rankings",
       "Choose Your Uni tool",
     ],
+    note:
+      "Good for understanding the landscape, comparing universities, and seeing how the platform works.",
   },
   {
     name: "Pro Monthly",
-    subtitle: "Full access, cancel anytime",
+    subtitle: "Flexible Pro access with full premium tools.",
     price: "$9.99",
     suffix: "/month",
-    badge: "Most Popular",
-    tone: "border-blue-300 bg-blue-50/40",
-    buttonTone: "bg-blue-600 text-white hover:bg-blue-700",
-    cta: "Continue to payment",
+    badge: "Flexible Full Access",
     planKey: "pro_monthly",
+    cta: "Start Pro Monthly",
+    valueLabel: "Good for getting started with Pro",
+    commitmentLine: "Best if you want flexibility or want to try Pro first.",
+    tone: "monthly",
     features: [
-      "Personalised Roadmap Score and Competitiveness Intel",
-      "Custom roadmap based on your Year and Targets",
+      "Everything in Free",
+      "Personalised roadmap score and competitiveness intel",
+      "Custom roadmap based on your year and targets",
       "UCAT and interview performance tracker",
       "What-if optimisation engine",
       "Application strategy and school-ranking tool",
@@ -68,27 +82,37 @@ const plans: Plan[] = [
       "Priority support",
     ],
     note:
-      "Great if you want flexibility while building the first paid version.",
+      "Best for students who want full access now, without committing to the full year yet.",
   },
   {
     name: "Pro Annual",
-    subtitle: "Less than $8.35/month. Best value.",
+    subtitle:
+      "The smartest option for serious applicants across the full cycle.",
     price: "$99.99",
     suffix: "/year",
     badge: "Best Value",
-    tone: "border-emerald-300 bg-emerald-50/50",
-    buttonTone: "bg-emerald-600 text-white hover:bg-emerald-700",
-    cta: "Continue to payment",
     planKey: "pro_annual",
+    cta: "Choose Annual and Save",
+    valueLabel: "Best for full-cycle applicants",
+    savingsLine: "Save $19.89 per year • 2 months free vs monthly",
+    commitmentLine:
+      "Just $8.33 per month billed annually, with uninterrupted access across the application cycle.",
+    tone: "annual",
     features: [
       "Everything in Pro Monthly",
       "Lowest effective price for the year",
       "Full access through the application cycle",
+      "Best option for Year 12 and gap-year students",
       "Priority product updates as new tools launch",
-      "Best option for Year 12 or gap-year students",
+      "Better value than paying month-to-month",
+    ],
+    annualBonus: [
+      "Priority access to new beta tools",
+      "Full-cycle continuity without monthly interruptions",
+      "Best choice for serious applicants planning across the year",
     ],
     note:
-      "Best for users who know they’ll use the full platform across the cycle.",
+      "This is the strongest choice if you know you want the platform throughout the application cycle.",
   },
 ];
 
@@ -111,20 +135,75 @@ const faqs = [
   },
 ];
 
-function cx(...classes: string[]) {
+function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
+}
+
+function getCardStyles(tone: Plan["tone"]) {
+  if (tone === "annual") {
+    return {
+      card: "border-emerald-400 bg-linear-to-b from-emerald-50 to-white shadow-xl shadow-emerald-200/60 ring-2 ring-emerald-200 lg:-mt-3",
+      iconWrap: "bg-white shadow-sm",
+      icon: "text-emerald-600",
+      price: "text-slate-950",
+      button:
+        "bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-not-allowed",
+      featureIcon: "text-emerald-600",
+      badge: "bg-slate-950 text-white",
+      valueBox:
+        "border-emerald-200 bg-emerald-100 text-emerald-900",
+      savingsBox:
+        "border-slate-900 bg-slate-950 text-white",
+      consentBox: "border-emerald-200 bg-white/90",
+      compareHeader: "border-emerald-300 bg-emerald-50",
+    };
+  }
+
+  if (tone === "monthly") {
+    return {
+      card: "border-blue-300 bg-linear-to-b from-blue-50 to-white shadow-sm",
+      iconWrap: "bg-white shadow-sm",
+      icon: "text-blue-600",
+      price: "text-slate-950",
+      button:
+        "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed",
+      featureIcon: "text-emerald-600",
+      badge: "bg-slate-950 text-white",
+      valueBox:
+        "border-blue-200 bg-blue-50 text-blue-900",
+      savingsBox:
+        "border-blue-200 bg-white text-slate-700",
+      consentBox: "border-slate-200 bg-white/90",
+      compareHeader: "border-blue-200 bg-blue-50",
+    };
+  }
+
+  return {
+    card: "border-slate-200 bg-white shadow-sm",
+    iconWrap: "bg-white shadow-sm",
+    icon: "text-slate-500",
+    price: "text-slate-950",
+    button:
+      "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100",
+    featureIcon: "text-emerald-600",
+    badge: "",
+    valueBox:
+      "border-slate-200 bg-slate-50 text-slate-700",
+    savingsBox:
+      "border-slate-200 bg-white text-slate-700",
+    consentBox: "border-slate-200 bg-white/90",
+    compareHeader: "border-slate-200 bg-slate-50",
+  };
 }
 
 function PricingCard({
   plan,
-  featured = false,
   onCheckout,
   loadingPlan,
   isSignedIn,
   currentPlan,
 }: {
   plan: Plan;
-  featured?: boolean;
   onCheckout: (plan: "pro_monthly" | "pro_annual", accepted: boolean) => void;
   loadingPlan: string | null;
   isSignedIn: boolean;
@@ -133,28 +212,29 @@ function PricingCard({
   const isPaidPlan = !!plan.planKey;
   const isLoading = loadingPlan === plan.planKey;
   const [accepted, setAccepted] = useState(false);
+  const styles = getCardStyles(plan.tone);
 
   const isCurrentFree = !plan.planKey && currentPlan === "free";
   const isCurrentPaid = !!plan.planKey && currentPlan === plan.planKey;
   const isCurrentPlan = isCurrentFree || isCurrentPaid;
 
   const buttonLabel = !isPaidPlan
-  ? isCurrentFree
-    ? "Current Plan"
-    : "Downgrade to Free"
-  : isCurrentPaid
-    ? "Current Plan"
-    : currentPlan === "pro_monthly" && plan.planKey === "pro_annual"
-      ? "Switch to Annual"
-      : currentPlan === "pro_annual" && plan.planKey === "pro_monthly"
-        ? "Switch to Monthly"
-        : isSignedIn
-          ? "Continue to payment"
-          : "Sign in to continue";
+    ? isCurrentFree
+      ? "Current Plan"
+      : "Downgrade to Free"
+    : isCurrentPaid
+      ? "Current Plan"
+      : currentPlan === "pro_monthly" && plan.planKey === "pro_annual"
+        ? "Switch to Annual"
+        : currentPlan === "pro_annual" && plan.planKey === "pro_monthly"
+          ? "Switch to Monthly"
+          : isSignedIn
+            ? plan.cta
+            : "Sign in to continue";
 
   const buttonDisabled = !isPaidPlan
-  ? isCurrentFree
-  : isCurrentPaid || isLoading || (!accepted && !isCurrentPaid);
+    ? isCurrentFree
+    : isCurrentPaid || isLoading || (!accepted && !isCurrentPaid);
 
   return (
     <motion.div
@@ -162,24 +242,28 @@ function PricingCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
       className={cx(
-        "relative rounded-3xl border p-6 shadow-sm",
-        plan.tone,
-        featured ? "scale-[1.01]" : ""
+        "relative rounded-3xl border p-6",
+        styles.card
       )}
     >
       {plan.badge ? (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-slate-950 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-white shadow-sm">
+        <div
+          className={cx(
+            "absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest shadow-sm",
+            styles.badge
+          )}
+        >
           {plan.badge}
         </div>
       ) : null}
 
-      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-sm">
+      <div className={cx("flex h-12 w-12 items-center justify-center rounded-2xl", styles.iconWrap)}>
         {plan.name === "Free" ? (
-          <ShieldCheck className="h-5 w-5 text-slate-500" />
+          <ShieldCheck className={cx("h-5 w-5", styles.icon)} />
         ) : plan.name === "Pro Monthly" ? (
-          <Zap className="h-5 w-5 text-blue-600" />
+          <Zap className={cx("h-5 w-5", styles.icon)} />
         ) : (
-          <Crown className="h-5 w-5 text-emerald-600" />
+          <Crown className={cx("h-5 w-5", styles.icon)} />
         )}
       </div>
 
@@ -191,11 +275,27 @@ function PricingCard({
       </div>
 
       <div className="mt-5 flex items-end gap-1">
-        <span className="text-5xl font-black tracking-tight text-slate-950">
+        <span className={cx("text-5xl font-black tracking-tight", styles.price)}>
           {plan.price}
         </span>
         <span className="pb-1 text-sm text-slate-500">{plan.suffix}</span>
       </div>
+
+      <div className={cx("mt-4 rounded-2xl border px-4 py-3", styles.valueBox)}>
+        <div className="text-sm font-semibold">{plan.valueLabel}</div>
+        {plan.commitmentLine ? (
+          <p className="mt-1 text-sm leading-6 opacity-90">{plan.commitmentLine}</p>
+        ) : null}
+      </div>
+
+      {plan.savingsLine ? (
+        <div className={cx("mt-3 rounded-2xl border px-4 py-3", styles.savingsBox)}>
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <Sparkles className="h-4 w-4" />
+            <span>{plan.savingsLine}</span>
+          </div>
+        </div>
+      ) : null}
 
       {isCurrentPlan ? (
         <div className="mt-4 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -205,7 +305,7 @@ function PricingCard({
 
       {isPaidPlan ? (
         <>
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-white/80 p-4 text-sm leading-6 text-slate-700">
+          <div className={cx("mt-5 rounded-2xl border p-4 text-sm leading-6 text-slate-700", styles.consentBox)}>
             Before you continue, please read and accept our{" "}
             <Link
               href="/legal/terms-of-use"
@@ -256,8 +356,8 @@ function PricingCard({
             onClick={() => plan.planKey && onCheckout(plan.planKey, accepted)}
             disabled={buttonDisabled}
             className={cx(
-              "mt-6 inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70",
-              plan.buttonTone
+              "mt-6 inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
+              styles.button
             )}
           >
             {isLoading ? "Redirecting..." : buttonLabel}
@@ -268,7 +368,7 @@ function PricingCard({
           href={plan.href ?? "/"}
           className={cx(
             "mt-6 inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
-            plan.buttonTone
+            styles.button
           )}
         >
           {buttonLabel}
@@ -278,16 +378,65 @@ function PricingCard({
       <ul className="mt-6 space-y-3 text-sm text-slate-700">
         {plan.features.map((feature) => (
           <li key={feature} className="flex items-start gap-2">
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+            <Check className={cx("mt-0.5 h-4 w-4 shrink-0", styles.featureIcon)} />
             <span>{feature}</span>
           </li>
         ))}
       </ul>
 
+      {plan.annualBonus?.length ? (
+        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+          <div className="text-sm font-semibold text-emerald-900">
+            Annual-only value stack
+          </div>
+          <ul className="mt-3 space-y-2 text-sm text-emerald-900">
+            {plan.annualBonus.map((item) => (
+              <li key={item} className="flex items-start gap-2">
+                <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {plan.note ? (
         <p className="mt-5 text-xs leading-5 text-slate-500">{plan.note}</p>
       ) : null}
     </motion.div>
+  );
+}
+
+function ComparisonColumn({
+  title,
+  eyebrow,
+  points,
+  tone,
+}: {
+  title: string;
+  eyebrow: string;
+  points: string[];
+  tone: "free" | "monthly" | "annual";
+}) {
+  const styles = getCardStyles(tone);
+
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className={cx("inline-flex rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-widest", styles.compareHeader)}>
+        {eyebrow}
+      </div>
+      <h3 className="mt-4 text-2xl font-black tracking-tight text-slate-950">
+        {title}
+      </h3>
+      <ul className="mt-5 space-y-3 text-sm text-slate-700">
+        {points.map((point) => (
+          <li key={point} className="flex items-start gap-2">
+            <Check className={cx("mt-0.5 h-4 w-4 shrink-0", styles.featureIcon)} />
+            <span>{point}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -442,29 +591,43 @@ export default function PricingClient({
   }, [searchParams, router]);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.10),transparent_24%),linear-gradient(180deg,#f8fafc_0%,#f6f7fb_42%,#f8fafc_100%)] text-slate-900">
+    <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-emerald-50/30 text-slate-900">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-4xl text-center">
-          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-700 shadow-sm">
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-slate-700 shadow-sm">
             Beta Phase — Limited Access
           </span>
+
           <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">
-            Get Access to Everything You Need
+            Choose the plan that gives you the full edge
           </h1>
-          <p className="mt-3 text-base leading-8 text-slate-600 sm:text-lg">
-            From exploration to execution. Choose the plan that fits your
-            medicine journey.
+
+          <p className="mt-4 text-base leading-8 text-slate-600 sm:text-lg">
+            Free helps you explore. Pro Monthly unlocks the tools. Pro Annual is
+            the smartest way to stay fully covered across the application cycle.
           </p>
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
+              Full-cycle access
+            </div>
+            <div className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 shadow-sm">
+              Save more with annual billing
+            </div>
+            <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
+              Built for serious medicine applicants
+            </div>
+          </div>
         </div>
 
-        <div className="mx-auto mt-6 max-w-5xl rounded-3xl bg-slate-950 px-6 py-5 text-center text-white shadow-lg">
-          <p className="text-sm font-bold uppercase tracking-[0.16em] text-white/85">
+        <div className="mx-auto mt-8 max-w-5xl rounded-3xl bg-slate-950 px-6 py-6 text-center text-white shadow-lg">
+          <p className="text-sm font-bold uppercase tracking-widest text-white/85">
             Early Beta Access
           </p>
           <p className="mt-2 text-sm leading-6 text-slate-200">
             Aussie Med Guide is currently in early beta. Features are actively
-            being built and improved. You are getting early access at a reduced
-            price in exchange for being part of this phase.
+            being built and improved. Early users are locking in access before
+            the platform becomes more complete and more expensive later.
           </p>
         </div>
 
@@ -474,7 +637,7 @@ export default function PricingClient({
           </div>
         ) : null}
 
-        <div className="mt-8 grid gap-5 lg:grid-cols-3">
+        <div className="mt-10 grid gap-5 lg:grid-cols-3 lg:items-start">
           <PricingCard
             plan={plans[0]}
             onCheckout={handleCheckout}
@@ -484,7 +647,6 @@ export default function PricingClient({
           />
           <PricingCard
             plan={plans[1]}
-            featured
             onCheckout={handleCheckout}
             loadingPlan={loadingPlan}
             isSignedIn={!!isSignedIn}
@@ -499,7 +661,89 @@ export default function PricingClient({
           />
         </div>
 
-        <div className="mx-auto mt-10 max-w-5xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mx-auto mt-14 max-w-6xl">
+          <div className="text-center">
+            <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-slate-700 shadow-sm">
+              What’s included
+            </span>
+            <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+              Why Annual should feel like the obvious choice
+            </h2>
+            <p className="mx-auto mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+              The difference is not just price. Annual gives you the strongest
+              value, the lowest effective monthly cost, and uninterrupted access
+              when the application cycle matters most.
+            </p>
+          </div>
+
+          <div className="mt-8 grid gap-5 lg:grid-cols-3">
+            <ComparisonColumn
+              title="Free"
+              eyebrow="Preview"
+              tone="free"
+              points={[
+                "Explore the platform and understand the pathway",
+                "Browse key planning resources",
+                "Compare universities and entry information",
+                "Best for early-stage students still figuring things out",
+              ]}
+            />
+            <ComparisonColumn
+              title="Pro Monthly"
+              eyebrow="Flexible access"
+              tone="monthly"
+              points={[
+                "Unlock all premium tools immediately",
+                "Best if you want to try Pro first",
+                "Good for shorter-term flexibility",
+                "A strong upgrade from Free",
+              ]}
+            />
+            <ComparisonColumn
+              title="Pro Annual"
+              eyebrow="Best overall value"
+              tone="annual"
+              points={[
+                "Everything in Pro Monthly",
+                "Save $19.89 per year compared with monthly",
+                "2 months free in effective value",
+                "Best for Year 12 and gap-year applicants using the platform across the full cycle",
+                "Priority access to new beta tools and updates",
+              ]}
+            />
+          </div>
+        </div>
+
+        <div className="mx-auto mt-14 max-w-5xl rounded-3xl border border-emerald-200 bg-linear-to-r from-emerald-50 to-white p-6 shadow-sm">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-bold uppercase tracking-widest text-emerald-800">
+                Recommendation
+              </div>
+              <h3 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
+                Most serious applicants should choose Pro Annual
+              </h3>
+              <p className="mt-2 text-sm leading-7 text-slate-700 sm:text-base">
+                If you’re going to use Aussie Med Guide across the year, Annual
+                is the strongest choice. It removes monthly friction, lowers the
+                effective price, and keeps your tools, planning, and progress in
+                one place through the cycle.
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-emerald-200 bg-white px-6 py-5 shadow-sm">
+              <div className="text-sm font-semibold text-slate-600">
+                Annual effective monthly cost
+              </div>
+              <div className="mt-1 text-4xl font-black tracking-tight text-slate-950">
+                $8.33
+              </div>
+              <div className="text-sm text-slate-500">per month billed yearly</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mx-auto mt-12 max-w-5xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-center gap-2 text-center">
             <HelpCircle className="h-5 w-5 text-slate-500" />
             <h2 className="text-2xl font-black tracking-tight text-slate-950">
