@@ -20,7 +20,7 @@ export default function GaPageView() {
       page_title: document.title,
       page_path: pathname,
       page_location: window.location.href,
-      send_to: "G-WTQDQGY7EY",
+      send_to: "G-T463JW8NKV",
       debug_mode: true,
     });
   }, [pathname]);
