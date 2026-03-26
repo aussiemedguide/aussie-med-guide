@@ -77,7 +77,6 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
 };
-
 export default function RootLayout({
   children,
 }: {
@@ -91,25 +90,33 @@ export default function RootLayout({
     >
       <html lang="en">
         <body className={jakarta.className}>
-          <PostHogProvider>{children}</PostHogProvider>
-          <GaPageView />
 
+          {/* Google Analytics base script */}
           <Script
             src="https://www.googletagmanager.com/gtag/js?id=G-WTQDQGY7EY"
             strategy="afterInteractive"
           />
+
           <Script id="google-analytics" strategy="afterInteractive">
             {`
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
               window.gtag = gtag;
+
               gtag('js', new Date());
-              gtag('config', 'G-WTQDQGY7EY', {
-                page_path: window.location.pathname,
-                debug_mode: true
-              });
+              gtag('config', 'G-WTQDQGY7EY');
             `}
           </Script>
+
+          <PostHogProvider>
+
+            {/* page tracking AFTER GA loads */}
+            <GaPageView />
+
+            {children}
+
+          </PostHogProvider>
+
         </body>
       </html>
     </ClerkProvider>
