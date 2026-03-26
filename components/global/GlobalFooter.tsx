@@ -71,10 +71,10 @@ export default function GlobalFooter() {
             </p>
 
             <a
-              href="mailto:support@aussiemedguide.com"
+              href="mailto:aussiemedguide@gmail.com"
               className="mt-4 inline-flex rounded-2xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-slate-600 hover:bg-slate-800"
             >
-              support@aussiemedguide.com
+              aussiemedguide@gmail.com
             </a>
 
             <ul className="mt-5 space-y-3 text-sm text-slate-300">

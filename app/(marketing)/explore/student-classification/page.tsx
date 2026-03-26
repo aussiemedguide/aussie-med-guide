@@ -653,74 +653,7 @@ const bodyNodes: BodyNode[] = [
     links: [
       { label: "Explore Cardiology", href: "https://litfl.com/ecg-library/" },
       { label: "Explore Radiology", href: "https://radiopaedia.org/" },
-    ],
-  },
-  {
-    id: "lungs",
-    label: "Emergency Chest Care",
-    shortLabel: "Chest",
-    icon: ShieldAlert,
-    accent: "text-orange-700",
-    glow: "from-orange-500 via-amber-500 to-yellow-400",
-    position: "top-[37.5%] left-[61.5%] -translate-x-1/2",
-    lineTo: [
-      { x2: 166, y2: 228 },
-      { x2: 94, y2: 294 },
-      { x2: 470, y2: 294 },
-      { x2: 404, y2: 222 },
-      { x2: 432, y2: 366 },
-    ],
-    specialistPositions: {
-      radiology: "top-[20%] left-[19%]",
-      emergency: "top-[35%] left-[4%]",
-      cardiology: "top-[20%] right-[18%]",
-      anaesthetics: "top-[34%] right-[4%]",
-      gp: "top-[48%] right-[10%]",
-    },
-    description:
-      "Heart disease often requires immediate, procedural, imaging, chronic, and preventive care all at once.",
-    exampleCondition: "Heart attack, arrhythmia, heart failure, congenital disease",
-    whyItMatters:
-      "A cardiac patient might meet ambulance staff, ED, cardiology, radiology, anaesthetics, surgery, rehab teams, and a GP.",
-    specialists: ["cardiology", "emergency", "anaesthetics", "radiology", "gp"],
-    teamwork: [
-      "Emergency teams handle the acute phase",
-      "Cardiology leads diagnosis and definitive medical care",
-      "Radiology and imaging guide decisions",
-      "Anaesthetics supports perioperative or procedural care",
-      "GP manages prevention and long-term follow-up",
-    ],
-    timeline: [
-      {
-        label: "Acute symptoms",
-        detail: "Chest pain, collapse, shortness of breath, or palpitations trigger urgent attention.",
-        icon: Siren,
-      },
-      {
-        label: "Rapid assessment",
-        detail: "ECG, blood tests, and early triage help determine how dangerous the situation is.",
-        icon: ClipboardList,
-      },
-      {
-        label: "Imaging and intervention planning",
-        detail: "Cardiology and imaging teams work out what the heart and vessels are doing.",
-        icon: ScanSearch,
-      },
-      {
-        label: "Definitive treatment",
-        detail: "The patient may receive medication, procedures, stents, surgery, or intensive monitoring.",
-        icon: HeartPulse,
-      },
-      {
-        label: "Secondary prevention",
-        detail: "Recovery depends on rehab, medication adherence, lifestyle change, and GP follow-up.",
-        icon: Home,
-      },
-    ],
-    links: [
-      { label: "Explore Cardiology", href: "https://litfl.com/ecg-library/" },
-      { label: "Explore Radiology", href: "https://radiopaedia.org/" },
-    ],
+     ],
   },
   {
     id: "lungs",

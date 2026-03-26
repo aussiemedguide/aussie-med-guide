@@ -123,7 +123,7 @@ export const LEGAL_DOCS: LegalDoc[] = [
       },
       {
         title: "14. Contact",
-        body: ["Privacy and data requests: support@aussiemedguide.com"],
+        body: ["Privacy and data requests: aussiemedguide@gmailcom"],
       },
     ],
   },
@@ -250,7 +250,7 @@ export const LEGAL_DOCS: LegalDoc[] = [
       },
       {
         title: "18. Contact",
-        body: ["Questions about these Terms: support@aussiemedguide.com"],
+        body: ["Questions about these Terms: aussiemedguide@gmailcom"],
       },
     ],
   },
@@ -413,7 +413,7 @@ export const LEGAL_DOCS: LegalDoc[] = [
       },
       {
         title: "11. Contact",
-        body: ["Billing and subscription questions: support@aussiemedguide.com"],
+        body: ["Billing and subscription questions: aussiemedguide@gmailcom"],
       },
     ],
   },
