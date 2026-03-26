@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
-import Script from "next/script";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import { PostHogProvider } from "./providers";
-import GaPageView from "@/components/ga-page-view";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -77,6 +76,7 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
 };
+
 export default function RootLayout({
   children,
 }: {
@@ -90,32 +90,12 @@ export default function RootLayout({
     >
       <html lang="en">
         <body className={jakarta.className}>
-
-          {/* Google Analytics base script */}
-          <Script
-            src="https://www.googletagmanager.com/gtag/js?id=G-T463JW8NKV"
-            strategy="afterInteractive"
-          />
-
-          <Script id="google-analytics" strategy="afterInteractive">
-            {`
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              window.gtag = gtag;
-
-              gtag('js', new Date());
-              gtag('config', 'G-T463JW8NKV');
-            `}
-          </Script>
-
           <PostHogProvider>
-
-            {/* page tracking AFTER GA loads */}
-            <GaPageView />
-
             {children}
-
           </PostHogProvider>
+
+          {/* Official GA integration */}
+          <GoogleAnalytics gaId="G-T463JW8NKV" />
 
         </body>
       </html>
