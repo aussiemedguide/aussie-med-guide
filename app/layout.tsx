@@ -90,12 +90,13 @@ export default function RootLayout({
     >
       <html lang="en">
         <body className={jakarta.className}>
+          
           <PostHogProvider>
             {children}
           </PostHogProvider>
 
-          {/* Official GA integration */}
-          <GoogleAnalytics gaId="G-T463JW8NKV" />
+          {/* Google Analytics */}
+          <GoogleAnalytics gaId="G-7802393RB0" />
 
         </body>
       </html>
