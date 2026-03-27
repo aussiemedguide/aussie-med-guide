@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/og-image.avif",
+        url: "/og-image.png",
         width: 1200,
         height: 630,
         alt: "Aussie Med Guide",
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     title: "Aussie Med Guide",
     description:
       "Compare Australian medical schools, understand entry requirements, and prepare for UCAT, ATAR, and interviews.",
-    images: ["/og-image.avif"],
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,

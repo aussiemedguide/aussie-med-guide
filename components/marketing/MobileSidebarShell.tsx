@@ -83,11 +83,12 @@ export default function MobileSidebarShell({
         <Link href="/" className="flex min-w-0 items-center gap-3">
           <div className="overflow-hidden rounded-2xl ring-1 ring-black/5">
             <Image
-              src="/images/logo/amg-logo.png"
+              src="/images/logo/amg-logo.svg"
               alt="Aussie Med Guide logo"
               width={44}
               height={44}
-              className="h-11 w-11 object-cover"
+              className="h-11 w-11"
+              priority
             />
           </div>
 
@@ -130,11 +131,12 @@ export default function MobileSidebarShell({
           <div className="flex min-w-0 items-center gap-3">
             <div className="overflow-hidden rounded-2xl ring-1 ring-black/5">
               <Image
-                src="/images/logo/amg-logo.png"
+                src="/images/logo/amg-logo.svg"
                 alt="Aussie Med Guide logo"
                 width={44}
                 height={44}
-                className="h-11 w-11 object-cover"
+                className="h-11 w-11"
+                priority 
               />
             </div>
 
