@@ -172,13 +172,16 @@ function SidebarBrand({ compact = false }: { compact?: boolean }) {
           )}
           aria-label="Go to Aussie Med Guide home"
         >
+          import Image from "next/image";
+          
           <Image
-            src="/images/logo/amg-logo.svg"
-            alt="Aussie Med Guide logo"
-            width={220}
-            height={220}
-            sizes="208px"
-            className="h-full w-full transition-transform group-hover:scale-105"
+          src="/images/logo/amg-logo.svg"
+          alt="Aussie Med Guide logo"
+          width={44}
+          height={44}
+          priority
+          fetchPriority="high"
+          className="h-11 w-11"
           />
         </Link>
       </div>

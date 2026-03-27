@@ -1,78 +1,53 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import posthog from "posthog-js";
-import { useUser } from "@clerk/nextjs";
+import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 
-function PostHogUserSync({ enabled }: { enabled: boolean }) {
-  const { user, isLoaded } = useUser();
-
-  useEffect(() => {
-    if (!enabled || !isLoaded) return;
-
-    if (user) {
-      posthog.identify(user.id, {
-        email: user.primaryEmailAddress?.emailAddress,
-        name: user.fullName ?? undefined,
-      });
-    } else {
-      posthog.reset();
-    }
-  }, [enabled, user, isLoaded]);
-
-  return null;
-}
-
-export function PostHogProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const hasInitialised = useRef(false);
+export function PostHogProvider({ children }: { children: ReactNode }) {
+  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
-    if (hasInitialised.current) return;
+    if (process.env.NODE_ENV !== "production") return;
+    if (typeof window === "undefined") return;
 
     const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-    const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
+    const host =
+      process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
 
-    if (!key || !host) return;
+    if (!key) return;
 
-    const initPostHog = () => {
-      if (hasInitialised.current) return;
+    const run = () => {
+      const start = async () => {
+        const posthogModule = await import("posthog-js");
+        const posthog = posthogModule.default;
 
-      posthog.init(key, {
-        api_host: host,
-        capture_pageview: false,
-        capture_pageleave: true,
-        person_profiles: "identified_only",
-        session_recording: {
-          maskAllInputs: false,
-        },
-      });
+        posthog.init(key, {
+          api_host: host,
+          person_profiles: "identified_only",
 
-      hasInitialised.current = true;
+          capture_pageview: true,
+          capture_pageleave: true,
+          autocapture: false,
+          disable_session_recording: true,
+          disable_surveys: true,
+
+          loaded: () => {
+            setEnabled(true);
+          },
+        });
+      };
+
+      void start();
     };
 
-    if ("requestIdleCallback" in window) {
-      const id = window.requestIdleCallback(() => {
-        initPostHog();
-      });
+    const timeout = setTimeout(run, 3000);
 
-      return () => window.cancelIdleCallback(id);
-    }
-
-    const timeout = setTimeout(() => {
-      initPostHog();
-    }, 1200);
-
-    return () => window.clearTimeout(timeout);
+    return () => {
+      clearTimeout(timeout);
+    };
   }, []);
 
-  return (
-    <>
-      <PostHogUserSync enabled={hasInitialised.current} />
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }
+
+export default PostHogProvider;

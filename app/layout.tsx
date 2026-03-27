@@ -8,18 +8,23 @@ import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
+  fallback: ["system-ui", "Arial", "sans-serif"],
 });
 
+const siteUrl = "https://www.aussiemedguide.com";
+const siteName = "Aussie Med Guide";
+const siteDescription =
+  "Aussie Med Guide helps Australian medicine applicants compare universities, understand UCAT and ATAR requirements, prepare for interviews, and plan their pathway.";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.aussiemedguide.com"),
+  metadataBase: new URL(siteUrl),
   title: {
-    default: "Aussie Med Guide",
-    template: "%s | Aussie Med Guide",
+    default: siteName,
+    template: `%s | ${siteName}`,
   },
-  description:
-    "Aussie Med Guide helps Australian medicine applicants compare universities, understand UCAT and ATAR requirements, prepare for interviews, and plan their pathway.",
+  description: siteDescription,
   keywords: [
     "Aussie Med Guide",
     "medicine entry Australia",
@@ -30,36 +35,36 @@ export const metadata: Metadata = {
     "medicine interview preparation",
     "medical school comparison Australia",
   ],
-  applicationName: "Aussie Med Guide",
-  authors: [{ name: "Aussie Med Guide" }],
-  creator: "Aussie Med Guide",
-  publisher: "Aussie Med Guide",
+  applicationName: siteName,
+  authors: [{ name: siteName }],
+  creator: siteName,
+  publisher: siteName,
   alternates: {
-    canonical: "https://www.aussiemedguide.com",
+    canonical: siteUrl,
   },
   openGraph: {
-    title: "Aussie Med Guide",
+    title: siteName,
     description:
       "Compare Australian medical schools, understand entry requirements, and prepare for UCAT, ATAR, and interviews.",
-    url: "https://www.aussiemedguide.com",
-    siteName: "Aussie Med Guide",
+    url: siteUrl,
+    siteName,
     locale: "en_AU",
     type: "website",
     images: [
       {
-        url: "https://www.aussiemedguide.com/og-image.png",
+        url: `${siteUrl}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: "Aussie Med Guide",
+        alt: siteName,
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Aussie Med Guide",
+    title: siteName,
     description:
       "Compare Australian medical schools, understand entry requirements, and prepare for UCAT, ATAR, and interviews.",
-    images: ["https://www.aussiemedguide.com/og-image.png"],
+    images: [`${siteUrl}/og-image.png`],
   },
   robots: {
     index: true,
@@ -78,23 +83,36 @@ export const metadata: Metadata = {
   },
 };
 
+const isProduction = process.env.NODE_ENV === "production";
+const gaId = process.env.NEXT_PUBLIC_GA_ID || "G-7802393RB0";
+
 export default function RootLayout({
   children,
 }: {
   children: ReactNode;
 }) {
   return (
-    <ClerkProvider
-      signInUrl="/sign-in"
-      signUpUrl="/sign-up"
-      afterSignOutUrl="/"
-    >
-      <html lang="en">
-        <body className={`${jakarta.className} min-h-screen bg-white text-slate-900 antialiased`}>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://clerk.aussiemedguide.com" />
+        <link rel="dns-prefetch" href="https://clerk.aussiemedguide.com" />
+        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+        <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+      </head>
+
+      <body
+        className={`${jakarta.className} min-h-screen bg-white text-slate-900 antialiased`}
+      >
+        <ClerkProvider
+          signInUrl="/sign-in"
+          signUpUrl="/sign-up"
+          afterSignOutUrl="/"
+        >
           <PostHogProvider>{children}</PostHogProvider>
-          <GoogleAnalytics gaId="G-7802393RB0" />
-        </body>
-      </html>
-    </ClerkProvider>
+        </ClerkProvider>
+
+        {isProduction && gaId ? <GoogleAnalytics gaId={gaId} /> : null}
+      </body>
+    </html>
   );
 }
