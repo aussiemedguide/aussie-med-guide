@@ -62,7 +62,7 @@ export function PostHogProvider({
       return () => window.cancelIdleCallback(id);
     }
 
-    const timeout = window.setTimeout(() => {
+    const timeout = setTimeout(() => {
       initPostHog();
     }, 1200);
 
