@@ -139,7 +139,7 @@ function SidebarSections() {
     <div className="space-y-5">
       {marketingSections.map((section) => (
         <div key={section.title}>
-          <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+          <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
             {section.title}
           </p>
           <div className="space-y-1">
@@ -177,8 +177,8 @@ function SidebarBrand({ compact = false }: { compact?: boolean }) {
             alt="Aussie Med Guide logo"
             width={220}
             height={220}
+            sizes="208px"
             className="h-full w-full transition-transform group-hover:scale-105"
-            priority 
           />
         </Link>
       </div>

@@ -9,10 +9,11 @@ import "./globals.css";
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://aussiemedguide.com"),
+  metadataBase: new URL("https://www.aussiemedguide.com"),
   title: {
     default: "Aussie Med Guide",
     template: "%s | Aussie Med Guide",
@@ -34,19 +35,19 @@ export const metadata: Metadata = {
   creator: "Aussie Med Guide",
   publisher: "Aussie Med Guide",
   alternates: {
-    canonical: "/",
+    canonical: "https://www.aussiemedguide.com",
   },
   openGraph: {
     title: "Aussie Med Guide",
     description:
       "Compare Australian medical schools, understand entry requirements, and prepare for UCAT, ATAR, and interviews.",
-    url: "https://aussiemedguide.com",
+    url: "https://www.aussiemedguide.com",
     siteName: "Aussie Med Guide",
     locale: "en_AU",
     type: "website",
     images: [
       {
-        url: "/og-image.png",
+        url: "https://www.aussiemedguide.com/og-image.png",
         width: 1200,
         height: 630,
         alt: "Aussie Med Guide",
@@ -58,7 +59,7 @@ export const metadata: Metadata = {
     title: "Aussie Med Guide",
     description:
       "Compare Australian medical schools, understand entry requirements, and prepare for UCAT, ATAR, and interviews.",
-    images: ["/og-image.png"],
+    images: ["https://www.aussiemedguide.com/og-image.png"],
   },
   robots: {
     index: true,
@@ -89,15 +90,9 @@ export default function RootLayout({
       afterSignOutUrl="/"
     >
       <html lang="en">
-        <body className={jakarta.className}>
-          
-          <PostHogProvider>
-            {children}
-          </PostHogProvider>
-
-          {/* Google Analytics */}
+        <body className={`${jakarta.className} min-h-screen bg-white text-slate-900 antialiased`}>
+          <PostHogProvider>{children}</PostHogProvider>
           <GoogleAnalytics gaId="G-7802393RB0" />
-
         </body>
       </html>
     </ClerkProvider>

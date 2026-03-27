@@ -34,7 +34,7 @@ function SidebarSections({
     <div className="space-y-5">
       {sections.map((section) => (
         <div key={section.title}>
-          <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+          <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
             {section.title}
           </p>
           <div className="space-y-1">
@@ -79,17 +79,17 @@ export default function MobileSidebarShell({
 
   return (
     <>
-      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
         <Link href="/" className="flex min-w-0 items-center gap-3">
           <div className="overflow-hidden rounded-2xl ring-1 ring-black/5">
             <Image
-              src="/images/logo/amg-logo.svg"
-              alt="Aussie Med Guide logo"
-              width={44}
-              height={44}
-              className="h-11 w-11"
-              priority
-            />
+             src="/images/logo/amg-logo.svg"
+             alt="Aussie Med Guide logo"
+             width={44}
+             height={44}
+             sizes="44px"
+             className="h-full w-full transition-transform group-hover:scale-105"
+             />
           </div>
 
           <div className="min-w-0">
@@ -131,12 +131,12 @@ export default function MobileSidebarShell({
           <div className="flex min-w-0 items-center gap-3">
             <div className="overflow-hidden rounded-2xl ring-1 ring-black/5">
               <Image
-                src="/images/logo/amg-logo.svg"
-                alt="Aussie Med Guide logo"
-                width={44}
-                height={44}
-                className="h-11 w-11"
-                priority 
+              src="/images/logo/amg-logo.svg"
+              alt="Aussie Med Guide logo"
+              width={44}
+              height={44}
+              sizes="44px"
+              className="h-full w-full transition-transform group-hover:scale-105"
               />
             </div>
 

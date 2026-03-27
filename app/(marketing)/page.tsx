@@ -35,7 +35,7 @@ const RoadmapSectionHome = dynamicImport(
   {
     loading: () => (
       <section className="mb-10 sm:mb-12">
-        <div className="overflow-hidden rounded-3xl border border-emerald-200 bg-linear-to-b from-emerald-50/65 to-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-6">
+        <div className="overflow-hidden rounded-3xl bg-emerald-700 px-5 py-7 text-white shadow-sm sm:bg-linear-to-br sm:from-emerald-800 sm:via-emerald-700 sm:to-emerald-600 sm:px-8 sm:py-12 sm:shadow-[0_25px_70px_rgba(16,185,129,0.35)] lg:px-10 lg:py-14">
           <div className="mx-auto max-w-4xl text-center">
             <div className="mx-auto h-8 w-32 rounded-full bg-emerald-100" />
             <div className="mx-auto mt-4 h-10 w-80 max-w-full rounded bg-slate-100" />
@@ -249,7 +249,7 @@ function SoftCard({
   return (
     <div
       className={cx(
-        "rounded-3xl border border-slate-200 bg-white/90 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur",
+        "rounded-3xl border border-slate-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.05)] sm:bg-white/90 sm:shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:backdrop-blur",
         className
       )}
     >
@@ -322,26 +322,46 @@ function HomeCard({ item }: { item: CardItem }) {
 function WelcomeHero() {
   return (
     <section className="mb-8 sm:mb-10">
-      <div className="overflow-hidden rounded-3xl bg-linear-to-br from-emerald-800 via-emerald-700 to-emerald-600 px-5 py-8 text-white shadow-[0_25px_70px_rgba(16,185,129,0.35)] sm:px-8 sm:py-12 lg:px-10 lg:py-14">
+      <div className="overflow-hidden rounded-3xl bg-linear-to-br from-emerald-800 via-emerald-700 to-emerald-600 px-5 py-7 text-white shadow-sm sm:px-8 sm:py-12 sm:shadow-[0_25px_70px_rgba(16,185,129,0.35)] lg:px-10 lg:py-14">
         <div className="mx-auto max-w-5xl text-center">
-          <span className="inline-flex items-center rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-emerald-50 backdrop-blur sm:px-4 sm:py-2 sm:text-sm">
+          <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-emerald-50 sm:px-4 sm:py-2 sm:text-sm">
             <Sparkles className="mr-2 h-4 w-4" />
             Medicine Entry Resource Hub
           </span>
 
-          <h1 className="mt-5 text-4xl font-black leading-[0.95] tracking-tight text-white sm:text-6xl lg:text-7xl">
+          <h1 className="mt-4 text-3xl font-black leading-[0.98] tracking-tight text-white sm:mt-5 sm:text-6xl lg:text-7xl">
             Welcome to the
             <br />
             Aussie Med Guide
           </h1>
 
-          <p className="mx-auto mt-5 max-w-3xl text-sm leading-7 text-emerald-50/95 sm:text-base sm:leading-8 lg:text-xl">
+          <p className="mx-auto mt-4 max-w-3xl text-sm leading-6 text-emerald-50/95 sm:mt-5 sm:text-base sm:leading-8 lg:text-xl">
             Your comprehensive tool for navigating Australian medical school
             admissions. From ATAR and UCAT requirements to scholarships and
             accommodation. Built by a med student for aspiring doctors.
           </p>
 
-          <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+          <div className="mt-5 grid grid-cols-3 gap-2 sm:hidden">
+            {[
+              { value: "21", label: "Schools" },
+              { value: "8", label: "States" },
+              { value: "3", label: "Pathways" },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-2xl bg-white/10 px-3 py-3 ring-1 ring-white/10"
+              >
+                <div className="text-2xl font-black tracking-tight text-white">
+                  {stat.value}
+                </div>
+                <div className="mt-1 text-[11px] text-emerald-50/90">
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 hidden sm:grid sm:grid-cols-3 sm:gap-4">
             {[
               { icon: GraduationCap, value: "21", label: "Med Schools" },
               { icon: Map, value: "8", label: "States & Territories" },
@@ -349,10 +369,10 @@ function WelcomeHero() {
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-3xl bg-white/10 p-5 backdrop-blur-sm ring-1 ring-white/10 sm:p-6"
+                className="rounded-3xl bg-white/10 p-6 ring-1 ring-white/10"
               >
-                <stat.icon className="mx-auto h-6 w-6 text-white sm:h-7 sm:w-7" />
-                <div className="mt-3 text-4xl font-black tracking-tight text-white sm:mt-4 sm:text-5xl">
+                <stat.icon className="mx-auto h-7 w-7 text-white" />
+                <div className="mt-4 text-5xl font-black tracking-tight text-white">
                   {stat.value}
                 </div>
                 <div className="mt-1 text-sm text-emerald-50/90">
@@ -397,7 +417,7 @@ function CardSection({
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.10),transparent_24%),radial-gradient(circle_at_right,rgba(139,92,246,0.08),transparent_28%),linear-gradient(180deg,#f8fafc_0%,#f6f7fb_42%,#f8fafc_100%)] text-slate-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900 sm:bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.10),transparent_24%),radial-gradient(circle_at_right,rgba(139,92,246,0.08),transparent_28%),linear-gradient(180deg,#f8fafc_0%,#f6f7fb_42%,#f8fafc_100%)]">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
         <WelcomeHero />
         <RoadmapSectionHome />

@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { useState } from "react";
 import { ArrowRight, ChevronDown, ShieldCheck, Target } from "lucide-react";
 
 type RoadmapStageKey = "year10_11" | "year12" | "gap" | "grad";
@@ -29,6 +28,7 @@ type StageData = {
   needle: string;
 };
 
+// KEEP YOUR EXISTING roadmapData OBJECT HERE EXACTLY AS-IS
 const roadmapData: Record<RoadmapStageKey, StageData> = {
   year10_11: {
     label: "Year 10 or 11",
@@ -353,14 +353,43 @@ function cx(...classes: string[]) {
   return classes.filter(Boolean).join(" ");
 }
 
+const stageButtons: {
+  key: RoadmapStageKey;
+  label: string;
+  dot: string;
+  activeTone: string;
+}[] = [
+  {
+    key: "year10_11",
+    label: "Year 10 or 11",
+    dot: "bg-emerald-400",
+    activeTone:
+      "from-emerald-500 to-teal-500 text-white border-emerald-400",
+  },
+  {
+    key: "year12",
+    label: "Year 12",
+    dot: "bg-rose-400",
+    activeTone: "from-rose-500 to-orange-500 text-white border-rose-400",
+  },
+  {
+    key: "gap",
+    label: "Gap Year",
+    dot: "bg-blue-400",
+    activeTone: "from-blue-500 to-indigo-500 text-white border-blue-400",
+  },
+  {
+    key: "grad",
+    label: "Graduate Applicant",
+    dot: "bg-violet-400",
+    activeTone:
+      "from-violet-500 to-purple-500 text-white border-violet-400",
+  },
+];
+
 function RoadmapPanel({ stage }: { stage: StageData }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22 }}
-      className="space-y-4"
-    >
+    <div className="space-y-4">
       <div className={cx("rounded-3xl border p-4 sm:p-5", stage.panelTone)}>
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0">
@@ -372,9 +401,11 @@ function RoadmapPanel({ stage }: { stage: StageData }) {
             >
               {stage.shortLabel}
             </span>
+
             <h3 className="mt-3 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
               Focus: {stage.focus}
             </h3>
+
             <p className="mt-1 text-sm leading-6 text-slate-600">
               Objective: {stage.objective}
             </p>
@@ -395,7 +426,7 @@ function RoadmapPanel({ stage }: { stage: StageData }) {
         </div>
 
         <div className="mt-5 border-t border-slate-200/80 pt-4">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
             Top 3 Priorities
           </p>
           <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-7 text-slate-700">
@@ -416,9 +447,10 @@ function RoadmapPanel({ stage }: { stage: StageData }) {
               <h4 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
                 {section.title}
               </h4>
+
               <span
                 className={cx(
-                  "w-fit rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em]",
+                  "w-fit rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-[0.12em]",
                   section.tone
                 )}
               >
@@ -443,6 +475,7 @@ function RoadmapPanel({ stage }: { stage: StageData }) {
           <ShieldCheck className="h-5 w-5" />
           Common Mistakes at This Stage
         </h4>
+
         <ul className="mt-3 space-y-2 text-sm leading-7 text-amber-900">
           {stage.mistakes.map((mistake) => (
             <li key={mistake} className="flex gap-2">
@@ -458,11 +491,12 @@ function RoadmapPanel({ stage }: { stage: StageData }) {
           <Target className="h-5 w-5" />
           What Moves the Needle Most
         </h4>
+
         <p className="mt-2 text-sm leading-7 text-emerald-900">
           {stage.needle}
         </p>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -471,59 +505,27 @@ export default function RoadmapSectionHome() {
     useState<RoadmapStageKey>("year10_11");
   const [expanded, setExpanded] = useState(false);
 
-  const currentStage = useMemo(() => roadmapData[activeStage], [activeStage]);
-
-  const stageButtons: {
-    key: RoadmapStageKey;
-    label: string;
-    dot: string;
-    activeTone: string;
-  }[] = [
-    {
-      key: "year10_11",
-      label: "Year 10 or 11",
-      dot: "bg-emerald-400",
-      activeTone:
-        "from-emerald-500 to-teal-500 text-white border-emerald-400",
-    },
-    {
-      key: "year12",
-      label: "Year 12",
-      dot: "bg-rose-400",
-      activeTone:
-        "from-rose-500 to-orange-500 text-white border-rose-400",
-    },
-    {
-      key: "gap",
-      label: "Gap Year",
-      dot: "bg-blue-400",
-      activeTone:
-        "from-blue-500 to-indigo-500 text-white border-blue-400",
-    },
-    {
-      key: "grad",
-      label: "Graduate Applicant",
-      dot: "bg-violet-400",
-      activeTone:
-        "from-violet-500 to-purple-500 text-white border-violet-400",
-    },
-  ];
+  const currentStage = roadmapData[activeStage];
 
   return (
     <section className="mb-10 sm:mb-12">
-      <div className="overflow-hidden rounded-3xl border border-emerald-200 bg-linear-to-b from-emerald-50/65 to-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-6">
+      <div className="overflow-hidden rounded-3xl border border-emerald-200 bg-white p-4 shadow-sm sm:bg-linear-to-b sm:from-emerald-50/65 sm:to-white sm:p-6 sm:shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
         <button
+          type="button"
           onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
           className="flex w-full items-start justify-between gap-3 text-left sm:gap-4"
         >
           <div className="mx-auto max-w-4xl flex-1 text-center">
             <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700 sm:px-4 sm:py-2 sm:text-sm">
               Your Roadmap
             </span>
+
             <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
               Where are you in your journey?
             </h2>
-            <p className="mx-auto mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+
+            <p className="mx-auto mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base sm:leading-7">
               Select your current stage to see a structured roadmap, priorities,
               and what actually moves the needle.
             </p>
@@ -532,7 +534,7 @@ export default function RoadmapSectionHome() {
           <div className="rounded-full border border-slate-200 bg-white p-2 shadow-sm">
             <ChevronDown
               className={cx(
-                "h-5 w-5 text-slate-500 transition",
+                "h-5 w-5 text-slate-500 transition-transform duration-200",
                 expanded ? "rotate-180" : "rotate-0"
               )}
             />
@@ -546,6 +548,7 @@ export default function RoadmapSectionHome() {
             return (
               <button
                 key={stage.key}
+                type="button"
                 onClick={() => {
                   setActiveStage(stage.key);
                   setExpanded(true);
@@ -554,7 +557,7 @@ export default function RoadmapSectionHome() {
                   "rounded-2xl border px-4 py-4 text-left shadow-sm transition duration-200 sm:px-5 sm:py-5",
                   isActive
                     ? `bg-linear-to-br ${stage.activeTone}`
-                    : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50/40"
+                    : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/40"
                 )}
               >
                 <div className="flex items-center gap-3">
@@ -573,11 +576,11 @@ export default function RoadmapSectionHome() {
           })}
         </div>
 
-        {expanded && (
+        {expanded ? (
           <div className="mt-6">
             <RoadmapPanel stage={currentStage} />
           </div>
-        )}
+        ) : null}
       </div>
     </section>
   );
