@@ -86,10 +86,9 @@ export default function MobileSidebarShell({
             <Image
              src="/images/logo/amg-logo.svg"
              alt="Aussie Med Guide logo"
-             width={44}
-             height={44}
-             sizes="44px"
-             className="h-full w-full transition-transform group-hover:scale-105"
+             width={40}
+             height={40}
+             className="object-contain"
              />
           </div>
 
@@ -135,10 +134,9 @@ export default function MobileSidebarShell({
               <Image
               src="/images/logo/amg-logo.svg"
               alt="Aussie Med Guide logo"
-              width={44}
-              height={44}
-              sizes="44px"
-              className="h-full w-full transition-transform group-hover:scale-105"
+              width={40}
+              height={40}
+              className="object-contain"
               />
             </div>
 

@@ -178,7 +178,10 @@ function SidebarBrand({ compact = false }: { compact?: boolean }) {
             width={compact ? 44 : 72}
             height={compact ? 44 : 72}
             priority
-            className="object-contain scale-110"
+            className={cx(
+    "h-full w-full",
+    compact ? "object-contain" : "object-cover scale-110"
+  )}
           />
         </Link>
       </div>
