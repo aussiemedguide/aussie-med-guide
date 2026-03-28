@@ -168,17 +168,17 @@ function SidebarBrand({ compact = false }: { compact?: boolean }) {
           href="/"
           aria-label="Go to Aussie Med Guide home"
           className={cx(
-            "group flex items-center justify-center overflow-hidden rounded-2xl border border-emerald-800/10 bg-emerald-700 shadow-sm transition hover:shadow-md",
+            "group flex items-center justify-center overflow-hidden rounded-2xl bg-emerald-700 shadow-sm transition hover:shadow-md",
             compact ? "h-14 w-14" : "h-20 w-20"
           )}
         >
           <Image
             src="/images/logo/amg-logo.svg"
             alt="Aussie Med Guide logo"
-            width={compact ? 44 : 72}
-            height={compact ? 44 : 72}
+            width={compact ? 56 : 80}
+            height={compact ? 56 : 80}
             priority
-            className="object-contain scale-110"
+            className="h-full w-full object-cover"
           />
         </Link>
       </div>
