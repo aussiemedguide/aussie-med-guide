@@ -161,30 +161,29 @@ function SidebarSections() {
 }
 
 function SidebarBrand({ compact = false }: { compact?: boolean }) {
-
-return (
-  <div className="border-b border-slate-200 pb-6">
-    <div className="flex justify-center">
-      <Link
-        href="/"
-        aria-label="Go to Aussie Med Guide home"
-        className={cx(
-          "group flex items-center justify-center rounded-3xl ring-1 ring-black/5 shadow-sm transition hover:shadow-md bg-white",
-          compact ? "h-12 w-12" : "h-14 w-14"
-        )}
-      >
-        <Image
-          src="/images/logo/amg-logo.svg"
-          alt="Aussie Med Guide logo"
-          width={36}
-          height={36}
-          priority
-          className="object-contain"
-        />
-      </Link>
+  return (
+    <div className="border-b border-slate-200 pb-6">
+      <div className="flex justify-center">
+        <Link
+          href="/"
+          aria-label="Go to Aussie Med Guide home"
+          className={cx(
+            "group flex items-center justify-center overflow-hidden rounded-2xl border border-emerald-800/10 bg-emerald-700 shadow-sm transition hover:shadow-md",
+            compact ? "h-14 w-14" : "h-20 w-20"
+          )}
+        >
+          <Image
+            src="/images/logo/amg-logo.svg"
+            alt="Aussie Med Guide logo"
+            width={compact ? 44 : 72}
+            height={compact ? 44 : 72}
+            priority
+            className="object-contain scale-110"
+          />
+        </Link>
+      </div>
     </div>
-  </div>
-);
+  );
 }
 
 function SidebarDisclaimer() {
