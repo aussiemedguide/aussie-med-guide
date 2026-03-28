@@ -181,7 +181,7 @@ function SidebarBrand({ compact = false }: { compact?: boolean }) {
           height={44}
           priority
           fetchPriority="high"
-          className="h-11 w-11"
+          className="h-11 w-11 object-contain"
           />
         </Link>
       </div>
