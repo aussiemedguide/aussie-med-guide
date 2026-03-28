@@ -1,8 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import ActiveNavLink, {
-  type NavIconKey,
-} from "@/components/marketing/ActiveNavLink";
+import type { NavIconKey } from "@/components/marketing/ActiveNavLink";
+import DesktopNavLink from "@/components/marketing/DesktopNavLink";
 import MobileSidebarShell from "@/components/marketing/MobileSidebarShell";
 
 type NavLinkItem = {
@@ -146,7 +145,7 @@ function SidebarSections() {
             {section.items
               .filter((item) => item.href && item.label && item.icon)
               .map((item) => (
-                <ActiveNavLink
+                <DesktopNavLink
                   key={item.href}
                   href={item.href}
                   label={item.label}
@@ -178,7 +177,7 @@ function SidebarBrand({ compact = false }: { compact?: boolean }) {
             width={72}
             height={72}
             priority
-            className="h-full w-full bject-contain scale-125"
+            className="h-full w-full object-contain scale-125"
           />
         </Link>
       </div>
