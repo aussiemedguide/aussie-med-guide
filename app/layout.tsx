@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Plus_Jakarta_Sans } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
 import { GoogleAnalytics } from "@next/third-parties/google";
-import { PostHogProvider } from "./providers";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -94,23 +92,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://clerk.aussiemedguide.com" />
-        <link rel="dns-prefetch" href="https://clerk.aussiemedguide.com" />
         <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
         <link rel="dns-prefetch" href="https://www.google-analytics.com" />
       </head>
-
       <body
         className={`${jakarta.className} min-h-screen bg-white text-slate-900 antialiased`}
       >
-        <ClerkProvider
-          signInUrl="/sign-in"
-          signUpUrl="/sign-up"
-          afterSignOutUrl="/"
-        >
-          <PostHogProvider>{children}</PostHogProvider>
-        </ClerkProvider>
-
+        {children}
         {isProduction && gaId ? <GoogleAnalytics gaId={gaId} /> : null}
       </body>
     </html>

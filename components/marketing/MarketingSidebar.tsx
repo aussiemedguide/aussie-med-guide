@@ -178,7 +178,7 @@ function SidebarBrand({ compact = false }: { compact?: boolean }) {
             width={72}
             height={72}
             priority
-            className="h-full w-full bject-contain scale-140"
+            className="h-full w-full bject-contain scale-125"
           />
         </Link>
       </div>
