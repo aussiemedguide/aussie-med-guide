@@ -82,7 +82,6 @@ export default function MobileSidebarShell({
       <header className="sticky top-0 z-40 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
         <Link href="/" className="flex min-w-0 items-center gap-3">
           <div className="overflow-hidden rounded-2xl ring-1 ring-black/5">
-            import Image from "next/image";
 
             <Image
              src="/images/logo/amg-logo.svg"
@@ -132,7 +131,6 @@ export default function MobileSidebarShell({
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className="overflow-hidden rounded-2xl ring-1 ring-black/5">
-              import Image from "next/image";
               
               <Image
               src="/images/logo/amg-logo.svg"
