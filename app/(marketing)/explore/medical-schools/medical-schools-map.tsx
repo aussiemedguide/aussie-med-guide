@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
-import "components/maps/leaflet-overrides.css";
+import "@/app/leaflet.css";
 import { ExternalLink, MapPin } from "lucide-react";
 
 type TacKey = "vtac" | "satac" | "qtac" | "uac" | "tisc" | "direct";
