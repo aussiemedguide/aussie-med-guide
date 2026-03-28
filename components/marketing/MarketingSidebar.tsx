@@ -175,13 +175,10 @@ function SidebarBrand({ compact = false }: { compact?: boolean }) {
           <Image
             src="/images/logo/amg-logo.svg"
             alt="Aussie Med Guide logo"
-            width={compact ? 44 : 72}
-            height={compact ? 44 : 72}
+            width={72}
+            height={72}
             priority
-            className={cx(
-    "h-full w-full",
-    compact ? "object-contain" : "object-cover scale-110"
-  )}
+            className="h-full w-full bject-contain scale-125"
           />
         </Link>
       </div>
