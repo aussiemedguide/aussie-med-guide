@@ -1603,73 +1603,81 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
   }
 
   async function submitArenaRun() {
-    if (!arenaRunId || !arenaSession) return;
+  if (!arenaRunId || !arenaSession) return;
 
-    const finalResponses = [...arenaResponses];
-    finalResponses[arenaQuestionIndex] = arenaDraftResponse.trim();
+  const finalResponses = [...arenaResponses];
+  finalResponses[arenaQuestionIndex] = arenaDraftResponse.trim();
 
-    const validResponseCount = finalResponses.filter((item) => item.trim()).length;
-    if (validResponseCount !== arenaSession.questions.length) {
-      alert("Please answer every arena question before submitting the run.");
-      return;
-    }
-
-    setIsSubmittingArena(true);
-    setIsRunningTimer(false);
-
-    try {
-      const res = await fetch("/api/train/arena/complete", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          runId: arenaRunId,
-          title: `${selectedArenaBoss.title} Arena Run`,
-          responses: finalResponses,
-          questions: arenaSession.questions,
-        }),
-      });
-
-      const data = (await res.json()) as ArenaRunResult | { error?: string };
-
-      if (!res.ok) {
-        throw new Error(
-          ("error" in data && data.error) || "Failed to complete arena run."
-        );
-      }
-
-      const resultData = data as ArenaRunResult;
-      setArenaResponses(finalResponses);
-      setArenaResult(resultData);
-
-      if (resultData.updatedProgress) {
-        setCommandProgress(resultData.updatedProgress);
-      } else {
-        await refreshCommandProgress();
-      }
-
-      const { data: attempts } = await supabase
-        .from("interview_attempts")
-        .select(
-          "id, created_at, mode, title, prompt, response, clarity, reasoning, empathy, structure, professionalism, overall, feedback, improvements"
-        )
-        .eq("clerk_user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(8);
-
-      if (attempts) {
-        setPracticeHistory(
-          (attempts as unknown as InterviewAttemptRow[]).map(mapDbAttempt)
-        );
-      }
-    } catch (error) {
-      console.error(error);
-      alert("Failed to submit arena run.");
-    } finally {
-      setIsSubmittingArena(false);
-    }
+  const validResponseCount = finalResponses.filter((item) => item.trim()).length;
+  if (validResponseCount !== arenaSession.questions.length) {
+    alert("Please answer every arena question before submitting the run.");
+    return;
   }
+
+  const combinedResponse = arenaSession.questions
+    .map((question, index) => {
+      const answer = finalResponses[index]?.trim() || "";
+      return `Q${index + 1}: ${question.prompt}\nA${index + 1}: ${answer}`;
+    })
+    .join("\n\n");
+
+  setIsSubmittingArena(true);
+  setIsRunningTimer(false);
+
+  try {
+    const res = await fetch("/api/train/arena/complete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        runId: arenaRunId,
+        title: `${selectedArenaBoss.title} Arena Run`,
+        response: combinedResponse,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error("Arena complete failed:", data);
+      throw new Error(data?.error || "Failed to complete arena run.");
+    }
+
+    const resultData = data as ArenaRunResult;
+
+    setArenaResponses(finalResponses);
+    setArenaResult(resultData);
+
+    if (resultData.updatedProgress) {
+      setCommandProgress(resultData.updatedProgress);
+    } else {
+      await refreshCommandProgress();
+    }
+
+    const { data: attempts } = await supabase
+      .from("interview_attempts")
+      .select(
+        "id, created_at, mode, title, prompt, response, clarity, reasoning, empathy, structure, professionalism, overall, feedback, improvements"
+      )
+      .eq("clerk_user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(8);
+
+    if (attempts) {
+      setPracticeHistory(
+        (attempts as unknown as InterviewAttemptRow[]).map(mapDbAttempt)
+      );
+    }
+  } catch (error) {
+    console.error(error);
+    alert(
+      error instanceof Error ? error.message : "Failed to submit arena run."
+    );
+  } finally {
+    setIsSubmittingArena(false);
+  }
+}
 
   async function evaluateWithBackend(fullText: string) {
     if (!(currentPrompt || currentPanelPrompt)) return;
