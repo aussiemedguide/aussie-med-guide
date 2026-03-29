@@ -1,5 +1,10 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useClerk, useUser } from "@clerk/nextjs";
+import { LogOut } from "lucide-react";
+
 import type { NavIconKey } from "@/components/marketing/ActiveNavLink";
 import DesktopNavLink from "@/components/marketing/DesktopNavLink";
 import MobileSidebarShell from "@/components/marketing/MobileSidebarShell";
@@ -141,17 +146,16 @@ function SidebarSections() {
           <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
             {section.title}
           </p>
+
           <div className="space-y-1">
-            {section.items
-              .filter((item) => item.href && item.label && item.icon)
-              .map((item) => (
-                <DesktopNavLink
-                  key={item.href}
-                  href={item.href}
-                  label={item.label}
-                  icon={item.icon}
-                />
-              ))}
+            {section.items.map((item) => (
+              <DesktopNavLink
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                icon={item.icon}
+              />
+            ))}
           </div>
         </div>
       ))}
@@ -159,28 +163,60 @@ function SidebarSections() {
   );
 }
 
-function SidebarBrand({ compact = false }: { compact?: boolean }) {
+function SidebarBrand() {
   return (
     <div className="border-b border-slate-200 pb-6">
       <div className="flex justify-center">
         <Link
           href="/"
-          aria-label="Go to Aussie Med Guide home"
-          className={cx(
-            "group flex items-center justify-center overflow-hidden rounded-2xl border border-emerald-800/10 bg-emerald-700 shadow-sm transition hover:shadow-md",
-            compact ? "h-14 w-14" : "h-20 w-20"
-          )}
+          className="group flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-emerald-800/10 bg-emerald-700 shadow-sm"
         >
           <Image
             src="/images/logo/amg-logo.svg"
             alt="Aussie Med Guide logo"
             width={72}
             height={72}
-            priority
             className="h-full w-full object-contain scale-125"
+            priority
           />
         </Link>
       </div>
+    </div>
+  );
+}
+
+function SidebarAccount() {
+  const { signOut } = useClerk();
+  const { user } = useUser();
+
+  return (
+    <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+        Account
+      </p>
+
+      <div className="flex items-center gap-2 mb-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">
+          {user?.firstName?.[0] ?? "A"}
+        </div>
+
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-800">
+            {user?.firstName ?? "Account"}
+          </p>
+          <p className="truncate text-xs text-slate-500">
+            {user?.primaryEmailAddress?.emailAddress}
+          </p>
+        </div>
+      </div>
+
+      <button
+        onClick={() => signOut()}
+        className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+      >
+        <LogOut className="h-4 w-4" />
+        Sign out
+      </button>
     </div>
   );
 }
@@ -189,9 +225,10 @@ function SidebarDisclaimer() {
   return (
     <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-500">
       <p className="font-semibold text-slate-700">Disclaimer</p>
+
       <p className="mt-2 leading-5">
-        This guide is for informational purposes only. Always verify details
-        with official university sources.
+        This guide is for informational purposes only.
+        Always verify details with official university sources.
       </p>
     </div>
   );
@@ -203,12 +240,17 @@ export default function MarketingSidebar() {
       <MobileSidebarShell sections={marketingSections} />
 
       <aside className="sticky top-0 hidden h-screen w-72 shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50 px-4 py-5 lg:block">
+
         <div className="mb-6">
           <SidebarBrand />
         </div>
 
         <SidebarSections />
+
+        <SidebarAccount />
+
         <SidebarDisclaimer />
+
       </aside>
     </>
   );
