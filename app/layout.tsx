@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
@@ -90,17 +91,19 @@ export default function RootLayout({
   children: ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
-        <link rel="dns-prefetch" href="https://www.google-analytics.com" />
-      </head>
-      <body
-        className={`${jakarta.className} min-h-screen bg-white text-slate-900 antialiased`}
-      >
-        {children}
-        {isProduction && gaId ? <GoogleAnalytics gaId={gaId} /> : null}
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <head>
+          <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+          <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+        </head>
+        <body
+          className={`${jakarta.className} min-h-screen bg-white text-slate-900 antialiased`}
+        >
+          {children}
+          {isProduction && gaId ? <GoogleAnalytics gaId={gaId} /> : null}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
