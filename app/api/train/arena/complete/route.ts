@@ -50,6 +50,13 @@ export async function POST(req: Request) {
       );
     }
 
+    if (run.result === "completed" || run.completed_at) {
+      return NextResponse.json(
+        { error: "This arena run has already been completed." },
+        { status: 409 }
+      );
+    }
+
     const boss = getBossByLevel(run.boss_level);
 
     if (!boss) {
@@ -60,7 +67,7 @@ export async function POST(req: Request) {
     }
 
     const scored = scoreArenaResponse({
-      response: body.response,
+      response: body.response.trim(),
       boss,
     });
 
@@ -69,7 +76,7 @@ export async function POST(req: Request) {
     const { error: updateArenaError } = await supabase
       .from("arena_runs")
       .update({
-        response: body.response,
+        response: body.response.trim(),
         result: scored.result,
         vitals_awarded: vitalsAwarded,
         score_overall: scored.breakdown.overall,
@@ -91,30 +98,39 @@ export async function POST(req: Request) {
       );
     }
 
-    const { error: attemptError } = await supabase.from("interview_attempts").insert({
-      clerk_user_id: userId,
-      mode: boss.mode.toUpperCase(),
-      title: body.title ?? `${boss.title} Arena Run`,
-      prompt: run.prompt,
-      response: body.response,
-      clarity: scored.breakdown.clarity,
-      reasoning: scored.breakdown.reasoning,
-      empathy: scored.breakdown.empathy,
-      structure: scored.breakdown.structure,
-      professionalism: scored.breakdown.professionalism,
-      overall: scored.breakdown.overall,
-      feedback: scored.feedback,
-      improvements: {
-        bossLevel: boss.level,
-        bossName: boss.title,
-        pass: scored.pass,
-        arena: true,
-      },
-    });
+    const promptForAttempt =
+      typeof run.prompt === "string" ? run.prompt : JSON.stringify(run.prompt);
+
+    const { error: attemptError } = await supabase
+      .from("interview_attempts")
+      .insert({
+        clerk_user_id: userId,
+        mode: boss.mode.toUpperCase(),
+        title: body.title?.trim() || `${boss.title} Arena Run`,
+        prompt: promptForAttempt,
+        response: body.response.trim(),
+        clarity: scored.breakdown.clarity,
+        reasoning: scored.breakdown.reasoning,
+        empathy: scored.breakdown.empathy,
+        structure: scored.breakdown.structure,
+        professionalism: scored.breakdown.professionalism,
+        overall: scored.breakdown.overall,
+        feedback: scored.feedback,
+        improvements: {
+          bossLevel: boss.level,
+          bossName: boss.title,
+          pass: scored.pass,
+          arena: true,
+        },
+      });
 
     if (attemptError) {
       return NextResponse.json(
-        { error: attemptError.message || "Arena run completed but interview attempt failed to save." },
+        {
+          error:
+            attemptError.message ||
+            "Arena run completed but interview attempt failed to save.",
+        },
         { status: 500 }
       );
     }
@@ -124,20 +140,23 @@ export async function POST(req: Request) {
       p_source: scored.pass ? "arena_win" : "arena_completion",
       p_delta: vitalsAwarded,
       p_reason: scored.pass
-            ? `Beat ${boss.title}`
-            : `Completed ${boss.title}`,
+        ? `Beat ${boss.title}`
+        : `Completed ${boss.title}`,
       p_source_id: String(body.runId),
       p_metadata: {
         runId: body.runId,
         bossLevel: boss.level,
         bossName: boss.title,
         pass: scored.pass,
-  },
-});
+      },
+    });
 
     if (awardError) {
       return NextResponse.json(
-        { error: awardError.message || "Arena run scored but vitals awarding failed." },
+        {
+          error:
+            awardError.message || "Arena run scored but vitals awarding failed.",
+        },
         { status: 500 }
       );
     }
@@ -167,6 +186,7 @@ export async function POST(req: Request) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unexpected server error.";
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

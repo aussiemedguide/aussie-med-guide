@@ -28,6 +28,11 @@ export async function POST(req: Request) {
     }
 
     const body = (await req.json()) as StartArenaBody;
+
+    if (!body?.bossId) {
+      return NextResponse.json({ error: "bossId is required." }, { status: 400 });
+    }
+
     const boss = getBossById(body.bossId);
 
     if (!boss) {
@@ -36,9 +41,7 @@ export async function POST(req: Request) {
 
     const { data: progress, error: progressError } = await supabase
       .from("command_progress")
-      .select(
-        "vitals_total, momentum_state, boss_level_unlocked"
-      )
+      .select("vitals_total, momentum_state, boss_level_unlocked")
       .eq("clerk_user_id", userId)
       .maybeSingle();
 
@@ -94,13 +97,23 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({
+      success: true,
       runId: arenaRun.id,
       startedAt: arenaRun.started_at,
       session,
+      boss: {
+        id: boss.id,
+        level: boss.level,
+        title: boss.title,
+        name: boss.name,
+        mode: boss.mode,
+        timeLimitSeconds: boss.timeLimitSeconds,
+      },
     });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unexpected server error.";
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
