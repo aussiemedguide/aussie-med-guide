@@ -14,6 +14,8 @@ import {
   type ArenaQuestion,
   type ArenaScoreBreakdown,
   type ArenaSessionPayload,
+  type ArenaSessionOutcome,
+  type ArenaStationOutcome,
 } from "./_lib/interview-arena";
 import {
   ArrowRight,
@@ -140,7 +142,14 @@ type ArenaRunResult = {
   pass: boolean;
   feedback: string;
   vitalsAwarded: number;
+  bossRewardAwarded?: number;
+  totalVitalsAwarded?: number;
   breakdown: ArenaScoreBreakdown;
+  averageOverall?: number;
+  stationOutcomes?: ArenaStationOutcome[];
+  failedStations?: number;
+  strongStations?: number;
+  sessionFlags?: string[];
   updatedProgress: CommandProgress | null;
   boss: {
     level: number;
@@ -586,6 +595,13 @@ function responseEnergyLabel(words: number) {
   return "Needs depth";
 }
 
+function getArenaVerdictTone(verdict: string | undefined) {
+  if (verdict === "strong") return "emerald";
+  if (verdict === "pass") return "blue";
+  if (verdict === "borderline") return "amber";
+  return "rose";
+}
+
 function Card({
   children,
   className,
@@ -1001,7 +1017,8 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
     useState<ArenaBossId>("warm_up_clinician");
   const [arenaSession, setArenaSession] = useState<ArenaSessionPayload | null>(null);
   const [arenaRunId, setArenaRunId] = useState<number | null>(null);
-  const [arenaResponse, setArenaResponse] = useState("");
+  const [arenaResponses, setArenaResponses] = useState<string[]>([]);
+  const [arenaDraftResponse, setArenaDraftResponse] = useState("");
   const [arenaQuestionIndex, setArenaQuestionIndex] = useState(0);
   const [arenaResult, setArenaResult] = useState<ArenaRunResult | null>(null);
   const [isStartingArena, setIsStartingArena] = useState(false);
@@ -1023,6 +1040,15 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
 
   const arenaCurrentQuestion =
     arenaSession?.questions?.[arenaQuestionIndex] ?? null;
+
+  const arenaQuestionCount = arenaSession?.questions.length ?? 0;
+  const arenaSavedResponsesCount = arenaResponses.filter((item) => item.trim()).length;
+  const arenaProgress =
+    arenaQuestionCount > 0
+      ? ((arenaQuestionIndex + 1) / arenaQuestionCount) * 100
+      : 0;
+  const isArenaLastQuestion =
+    arenaQuestionCount > 0 && arenaQuestionIndex === arenaQuestionCount - 1;
 
   const currentVoiceId =
     interviewTab === "arena"
@@ -1068,7 +1094,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
         .trim();
 
       if (interviewTab === "arena") {
-        setArenaResponse(merged);
+        setArenaDraftResponse(merged);
       } else {
         setCurrentResponse(merged);
       }
@@ -1090,7 +1116,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
         .trim();
 
       if (interviewTab === "arena") {
-        setArenaResponse(committedTranscriptRef.current);
+        setArenaDraftResponse(committedTranscriptRef.current);
       } else {
         setCurrentResponse(committedTranscriptRef.current);
       }
@@ -1164,7 +1190,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
     try {
       committedTranscriptRef.current =
         interviewTab === "arena"
-          ? arenaResponse.trim()
+          ? arenaDraftResponse.trim()
           : currentResponse.trim();
 
       setPulseMode("listening");
@@ -1201,7 +1227,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
     committedTranscriptRef.current = "";
 
     if (interviewTab === "arena") {
-      setArenaResponse("");
+      setArenaDraftResponse("");
     } else {
       setCurrentResponse("");
     }
@@ -1380,8 +1406,11 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
   const responseWords = useMemo(() => wordCount(currentResponse), [currentResponse]);
   const responseCharacters = currentResponse.length;
 
-  const arenaWords = useMemo(() => wordCount(arenaResponse), [arenaResponse]);
-  const arenaCharacters = arenaResponse.length;
+  const arenaWords = useMemo(
+    () => wordCount(arenaDraftResponse),
+    [arenaDraftResponse]
+  );
+  const arenaCharacters = arenaDraftResponse.length;
 
   const sessionTheme = currentPrompt?.theme || currentPanelPrompt?.theme || "Practice";
   const sessionTitle =
@@ -1460,10 +1489,54 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
   }
 
   function resetArenaDraft() {
-    setArenaResponse("");
+    setArenaResponses([]);
+    setArenaDraftResponse("");
     setArenaQuestionIndex(0);
     setArenaResult(null);
+    setArenaSession(null);
+    setArenaRunId(null);
     committedTranscriptRef.current = "";
+    setIsRunningTimer(false);
+  }
+
+  function saveArenaDraftAtIndex(index: number, value: string) {
+    setArenaResponses((prev) => {
+      const next = [...prev];
+      next[index] = value.trim();
+      return next;
+    });
+  }
+
+  function goToArenaQuestion(nextIndex: number) {
+    if (!arenaSession) return;
+
+    const clampedIndex = Math.max(
+      0,
+      Math.min(nextIndex, arenaSession.questions.length - 1)
+    );
+
+    setArenaResponses((prev) => {
+      const next = [...prev];
+      next[arenaQuestionIndex] = arenaDraftResponse.trim();
+      const nextValue = next[clampedIndex] ?? "";
+      setArenaDraftResponse(nextValue);
+      committedTranscriptRef.current = nextValue;
+      return next;
+    });
+
+    setArenaQuestionIndex(clampedIndex);
+  }
+
+  function goArenaNext() {
+    if (!arenaSession) return;
+    if (arenaQuestionIndex >= arenaSession.questions.length - 1) return;
+    goToArenaQuestion(arenaQuestionIndex + 1);
+  }
+
+  function goArenaPrevious() {
+    if (!arenaSession) return;
+    if (arenaQuestionIndex <= 0) return;
+    goToArenaQuestion(arenaQuestionIndex - 1);
   }
 
   function generateNewPrompt() {
@@ -1490,7 +1563,8 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
   async function startArenaRun() {
     setIsStartingArena(true);
     setArenaResult(null);
-    setArenaResponse("");
+    setArenaResponses([]);
+    setArenaDraftResponse("");
     setArenaQuestionIndex(0);
     committedTranscriptRef.current = "";
 
@@ -1511,8 +1585,13 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
         throw new Error(data?.error || "Failed to start arena run.");
       }
 
+      const nextSession = data.session as ArenaSessionPayload;
+
       setArenaRunId(data.runId as number);
-      setArenaSession(data.session as ArenaSessionPayload);
+      setArenaSession(nextSession);
+      setArenaResponses(new Array(nextSession.questions.length).fill(""));
+      setArenaDraftResponse("");
+      setArenaQuestionIndex(0);
       setTimerSeconds(0);
       setIsRunningTimer(true);
     } catch (error) {
@@ -1524,7 +1603,16 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
   }
 
   async function submitArenaRun() {
-    if (!arenaRunId || !arenaResponse.trim()) return;
+    if (!arenaRunId || !arenaSession) return;
+
+    const finalResponses = [...arenaResponses];
+    finalResponses[arenaQuestionIndex] = arenaDraftResponse.trim();
+
+    const validResponseCount = finalResponses.filter((item) => item.trim()).length;
+    if (validResponseCount !== arenaSession.questions.length) {
+      alert("Please answer every arena question before submitting the run.");
+      return;
+    }
 
     setIsSubmittingArena(true);
     setIsRunningTimer(false);
@@ -1537,18 +1625,22 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
         },
         body: JSON.stringify({
           runId: arenaRunId,
-          response: arenaResponse.trim(),
           title: `${selectedArenaBoss.title} Arena Run`,
+          responses: finalResponses,
+          questions: arenaSession.questions,
         }),
       });
 
       const data = (await res.json()) as ArenaRunResult | { error?: string };
 
       if (!res.ok) {
-        throw new Error(("error" in data && data.error) || "Failed to complete arena run.");
+        throw new Error(
+          ("error" in data && data.error) || "Failed to complete arena run."
+        );
       }
 
       const resultData = data as ArenaRunResult;
+      setArenaResponses(finalResponses);
       setArenaResult(resultData);
 
       if (resultData.updatedProgress) {
@@ -1567,7 +1659,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
         .limit(8);
 
       if (attempts) {
-        setPracticeHistory((attempts as unknown as InterviewAttemptRow[]).map(mapDbAttempt));
+        setPracticeHistory(
+          (attempts as unknown as InterviewAttemptRow[]).map(mapDbAttempt)
+        );
       }
     } catch (error) {
       console.error(error);
@@ -1731,7 +1825,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
     }
   }
 
-  return (
+    return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -2302,7 +2396,8 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                   </div>
                 </>
               )}
-                            {activeTab === "interview" && (
+
+              {activeTab === "interview" && (
                 <>
                   <div className="flex flex-wrap gap-3">
                     <button
@@ -2850,8 +2945,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                       </div>
                     </div>
                   )}
-
-                  {interviewTab === "arena" && (
+                                    {interviewTab === "arena" && (
                     <div className="space-y-6">
                       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <PracticeMetricTile
@@ -2877,7 +2971,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                           value={`${
                             unlockedBosses.filter((item) => item.unlocked).length
                           }/${ARENA_BOSSES.length}`}
-                          sub="Boss progression"
+                          sub={`Boss progression · unlocked to Lv ${arenaUnlockedBossLevel}`}
                           tone="amber"
                         />
                       </div>
@@ -2895,8 +2989,8 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                 </h3>
                                 <p className="mt-2 text-sm leading-6 text-slate-600">
                                   Beat bosses to prove your interview readiness.
-                                  Stronger bosses demand more Vitals and better
-                                  momentum.
+                                  Stronger bosses demand more Vitals, stronger momentum,
+                                  and more consistent station-level performance.
                                 </p>
                               </div>
 
@@ -2935,6 +3029,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                           <SoftBadge tone={unlocked ? "emerald" : "rose"}>
                                             {unlocked ? "Unlocked" : "Locked"}
                                           </SoftBadge>
+                                          <SoftBadge tone="slate">
+                                            {boss.followUpStyle}
+                                          </SoftBadge>
                                         </div>
                                         <p className="mt-2 text-lg font-bold text-slate-950">
                                           {boss.title}
@@ -2968,6 +3065,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                       <SoftBadge tone="amber">
                                         Unlock at {boss.unlockVitals} Vitals
                                       </SoftBadge>
+                                      <SoftBadge tone="violet">
+                                        {boss.questionCount} questions
+                                      </SoftBadge>
                                       {boss.requiresMomentum ? (
                                         <SoftBadge tone="violet">
                                           Need {getMomentumLabel(boss.requiresMomentum)}
@@ -2992,8 +3092,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                   {selectedArenaBoss.title}
                                 </h3>
                                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                                  {selectedArenaBoss.name} ·{" "}
-                                  {selectedArenaBoss.difficultyLabel}
+                                  {selectedArenaBoss.name} · {selectedArenaBoss.difficultyLabel}
                                 </p>
                               </div>
 
@@ -3003,6 +3102,9 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                 </SoftBadge>
                                 <SoftBadge tone="blue">
                                   {selectedArenaBoss.mode.toUpperCase()}
+                                </SoftBadge>
+                                <SoftBadge tone="amber">
+                                  Pass {selectedArenaBoss.minPassOverall}+
                                 </SoftBadge>
                               </div>
                             </div>
@@ -3020,9 +3122,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                   <p className="mt-2 text-sm font-semibold text-slate-900">
                                     {selectedArenaBoss.unlockVitals} Vitals
                                     {selectedArenaBoss.requiresMomentum
-                                      ? ` + ${getMomentumLabel(
-                                          selectedArenaBoss.requiresMomentum
-                                        )}`
+                                      ? ` + ${getMomentumLabel(selectedArenaBoss.requiresMomentum)}`
                                       : ""}
                                   </p>
                                 </div>
@@ -3033,10 +3133,28 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                   </p>
                                   <p className="mt-2 text-sm font-semibold text-slate-900">
                                     {selectedArenaBoss.questionCount} questions ·{" "}
-                                    {Math.round(
-                                      selectedArenaBoss.timeLimitSeconds / 60
-                                    )}{" "}
-                                    min
+                                    {Math.round(selectedArenaBoss.timeLimitSeconds / 60)} min
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                    Follow-up style
+                                  </p>
+                                  <p className="mt-2 text-sm font-semibold text-slate-900 capitalize">
+                                    {selectedArenaBoss.followUpStyle}
+                                  </p>
+                                </div>
+
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                    Recommended answer band
+                                  </p>
+                                  <p className="mt-2 text-sm font-semibold text-slate-900">
+                                    {selectedArenaBoss.recommendedWordsMin}–
+                                    {selectedArenaBoss.recommendedWordsMax} words
                                   </p>
                                 </div>
                               </div>
@@ -3068,9 +3186,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                   <input
                                     type="checkbox"
                                     checked={voiceModeEnabled}
-                                    onChange={(e) =>
-                                      setVoiceModeEnabled(e.target.checked)
-                                    }
+                                    onChange={(e) => setVoiceModeEnabled(e.target.checked)}
                                   />
                                 </label>
 
@@ -3081,9 +3197,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                   <input
                                     type="checkbox"
                                     checked={autoPlayQuestion}
-                                    onChange={(e) =>
-                                      setAutoPlayQuestion(e.target.checked)
-                                    }
+                                    onChange={(e) => setAutoPlayQuestion(e.target.checked)}
                                   />
                                 </label>
                               </div>
@@ -3111,7 +3225,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                 <p className="mt-2 text-sm leading-6 text-slate-600">
                                   Start this boss to generate a real interview
                                   battle with timed questioning, Pulse voice,
-                                  scoring, feedback, and pass or fail.
+                                  per-station scoring, feedback, and pass or fail.
                                 </p>
 
                                 <div className="mt-5 flex flex-wrap justify-center gap-3">
@@ -3129,9 +3243,7 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                     className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
                                   >
                                     <Crown className="h-4 w-4" />
-                                    {isStartingArena
-                                      ? "Starting..."
-                                      : "Enter Arena"}
+                                    {isStartingArena ? "Starting..." : "Enter Arena"}
                                   </button>
                                 </div>
                               </div>
@@ -3158,6 +3270,25 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                     </div>
                                   </div>
 
+                                  <div className="mt-4">
+                                    <div className="mb-2 flex items-center justify-between text-sm">
+                                      <span className="font-medium text-slate-700">
+                                        Question {arenaQuestionIndex + 1} of {arenaQuestionCount}
+                                      </span>
+                                      <span className="font-semibold text-slate-900">
+                                        {Math.round(arenaProgress)}%
+                                      </span>
+                                    </div>
+                                    <div className="h-2 rounded-full bg-violet-100">
+                                      <div
+                                        className="h-2 rounded-full bg-linear-to-r from-violet-500 via-fuchsia-500 to-sky-500 transition-all"
+                                        style={{
+                                          width: `${Math.max(0, Math.min(100, arenaProgress))}%`,
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+
                                   <div className="mt-4 rounded-2xl border border-violet-200 bg-white p-4">
                                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">
                                       Boss intro
@@ -3174,14 +3305,46 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                           Question {arenaQuestionIndex + 1} of{" "}
                                           {arenaSession.questions.length}
                                         </p>
-                                        <SoftBadge tone="blue">
-                                          {arenaCurrentQuestion.theme}
-                                        </SoftBadge>
+                                        <div className="flex flex-wrap gap-2">
+                                          <SoftBadge tone="blue">
+                                            {arenaCurrentQuestion.theme}
+                                          </SoftBadge>
+                                          <SoftBadge tone="amber">
+                                            {arenaCurrentQuestion.promptType}
+                                          </SoftBadge>
+                                        </div>
                                       </div>
 
                                       <p className="mt-2 text-base font-semibold leading-7 text-slate-900">
                                         {arenaCurrentQuestion.prompt}
                                       </p>
+
+                                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                        <div className="rounded-2xl bg-slate-50 p-3">
+                                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                                            Difficulty
+                                          </p>
+                                          <p className="mt-1 text-sm font-semibold text-slate-900">
+                                            {arenaCurrentQuestion.difficulty}
+                                          </p>
+                                        </div>
+                                        <div className="rounded-2xl bg-slate-50 p-3">
+                                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                                            Evidence
+                                          </p>
+                                          <p className="mt-1 text-sm font-semibold text-slate-900">
+                                            {arenaCurrentQuestion.evidenceExpectation}
+                                          </p>
+                                        </div>
+                                        <div className="rounded-2xl bg-slate-50 p-3">
+                                          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                                            Reasoning
+                                          </p>
+                                          <p className="mt-1 text-sm font-semibold text-slate-900">
+                                            {arenaCurrentQuestion.reasoningDemand}
+                                          </p>
+                                        </div>
+                                      </div>
 
                                       {arenaCurrentQuestion.followUps.length > 0 ? (
                                         <div className="mt-4 rounded-2xl bg-slate-50 p-4">
@@ -3203,6 +3366,37 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                       ) : null}
                                     </div>
                                   ) : null}
+
+                                  {arenaResponses.length > 0 && (
+                                    <div className="mt-4 rounded-2xl border border-violet-200 bg-white p-4">
+                                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">
+                                        Run progress
+                                      </p>
+                                      <div className="mt-3 flex flex-wrap gap-2">
+                                        {arenaResponses.map((response, index) => (
+                                          <button
+                                            key={`arena-progress-${index}`}
+                                            type="button"
+                                            onClick={() => goToArenaQuestion(index)}
+                                            className={cn(
+                                              "rounded-full border px-3 py-1 text-xs font-semibold transition",
+                                              index === arenaQuestionIndex
+                                                ? "border-violet-300 bg-violet-100 text-violet-700"
+                                                : response.trim()
+                                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                                  : "border-slate-200 bg-white text-slate-600"
+                                            )}
+                                          >
+                                            Q{index + 1}{" "}
+                                            {response.trim() ? "saved" : "empty"}
+                                          </button>
+                                        ))}
+                                      </div>
+                                      <p className="mt-3 text-xs text-slate-500">
+                                        {arenaSavedResponsesCount}/{arenaQuestionCount} answered
+                                      </p>
+                                    </div>
+                                  )}
                                 </div>
 
                                 <div className="grid gap-3 sm:grid-cols-3">
@@ -3263,14 +3457,14 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                     onClick={resetArenaDraft}
                                     className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
                                   >
-                                    Reset arena draft
+                                    Reset arena run
                                   </button>
                                 </div>
 
                                 <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3">
                                   <textarea
-                                    value={arenaResponse}
-                                    onChange={(e) => setArenaResponse(e.target.value)}
+                                    value={arenaDraftResponse}
+                                    onChange={(e) => setArenaDraftResponse(e.target.value)}
                                     placeholder="Write or dictate your Interview Arena answer here..."
                                     className="min-h-80 w-full rounded-3xl border border-slate-200 bg-white px-4 py-4 text-sm leading-7 outline-none focus:border-slate-400"
                                   />
@@ -3279,15 +3473,34 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                 <div className="flex flex-wrap gap-3">
                                   <button
                                     type="button"
-                                    onClick={submitArenaRun}
-                                    disabled={isSubmittingArena || !arenaResponse.trim()}
-                                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                                    onClick={goArenaPrevious}
+                                    disabled={!arenaSession || arenaQuestionIndex === 0}
+                                    className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50"
                                   >
-                                    {isSubmittingArena
-                                      ? "Submitting..."
-                                      : "Submit arena run"}
-                                    <ChevronRight className="h-4 w-4" />
+                                    Previous
                                   </button>
+
+                                  {!isArenaLastQuestion ? (
+                                    <button
+                                      type="button"
+                                      onClick={goArenaNext}
+                                      disabled={!arenaSession}
+                                      className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                                    >
+                                      Save and next
+                                      <ChevronRight className="h-4 w-4" />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={submitArenaRun}
+                                      disabled={isSubmittingArena}
+                                      className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                                    >
+                                      {isSubmittingArena ? "Submitting..." : "Submit arena run"}
+                                      <ChevronRight className="h-4 w-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             )}
@@ -3325,10 +3538,10 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
 
                                   <div className="rounded-3xl border border-white/70 bg-white px-4 py-3 text-right">
                                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                      Vitals awarded
+                                      Total vitals
                                     </p>
                                     <p className="mt-1 text-3xl font-black tracking-tight text-violet-700">
-                                      +{arenaResult.vitalsAwarded}
+                                      +{arenaResult.totalVitalsAwarded ?? arenaResult.vitalsAwarded}
                                     </p>
                                   </div>
                                 </div>
@@ -3360,8 +3573,156 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                   />
                                 </div>
 
-                                {arenaResult.pass &&
-                                arenaResult.boss.level === 5 ? (
+                                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                  <div className="rounded-2xl border border-white/70 bg-white p-4">
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                                      Response vitals
+                                    </p>
+                                    <p className="mt-1 text-lg font-black text-slate-950">
+                                      +{arenaResult.vitalsAwarded}
+                                    </p>
+                                  </div>
+                                  <div className="rounded-2xl border border-white/70 bg-white p-4">
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                                      Boss reward
+                                    </p>
+                                    <p className="mt-1 text-lg font-black text-slate-950">
+                                      +{arenaResult.bossRewardAwarded ?? 0}
+                                    </p>
+                                  </div>
+                                  <div className="rounded-2xl border border-white/70 bg-white p-4">
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                                      Failed stations
+                                    </p>
+                                    <p className="mt-1 text-lg font-black text-slate-950">
+                                      {arenaResult.failedStations ?? 0}
+                                    </p>
+                                  </div>
+                                  <div className="rounded-2xl border border-white/70 bg-white p-4">
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                                      Strong stations
+                                    </p>
+                                    <p className="mt-1 text-lg font-black text-slate-950">
+                                      {arenaResult.strongStations ?? 0}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {arenaResult.sessionFlags && arenaResult.sessionFlags.length > 0 ? (
+                                  <div className="mt-5 rounded-2xl border border-white/70 bg-white p-4">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                      Session flags
+                                    </p>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                      {arenaResult.sessionFlags.map((flag) => (
+                                        <SoftBadge key={flag} tone="slate">
+                                          {flag}
+                                        </SoftBadge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : null}
+
+                                {arenaResult.stationOutcomes && arenaResult.stationOutcomes.length > 0 ? (
+                                  <div className="mt-5 space-y-4">
+                                    <p className="text-sm font-semibold uppercase tracking-wider text-slate-600">
+                                      Station breakdown
+                                    </p>
+
+                                    {arenaResult.stationOutcomes.map((station, index) => (
+                                      <div
+                                        key={`${station.questionId}-${index}`}
+                                        className="rounded-3xl border border-white/70 bg-white p-5"
+                                      >
+                                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                          <div>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              <p className="text-sm font-semibold text-slate-900">
+                                                Station {index + 1}
+                                              </p>
+                                              <SoftBadge tone="blue">
+                                                {station.theme}
+                                              </SoftBadge>
+                                              <SoftBadge tone={getArenaVerdictTone(station.verdict)}>
+                                                {station.verdict}
+                                              </SoftBadge>
+                                            </div>
+                                            <p className="mt-3 text-base font-semibold leading-7 text-slate-900">
+                                              {station.questionPrompt}
+                                            </p>
+                                            <p className="mt-3 text-sm leading-7 text-slate-700">
+                                              {station.feedback}
+                                            </p>
+                                          </div>
+
+                                          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
+                                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                                              Overall
+                                            </p>
+                                            <p className="mt-1 text-2xl font-black text-slate-950">
+                                              {station.breakdown.overall}
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        <div className="mt-4 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                                          {[
+                                            ["Clarity", station.breakdown.clarity],
+                                            ["Reasoning", station.breakdown.reasoning],
+                                            ["Empathy", station.breakdown.empathy],
+                                            ["Structure", station.breakdown.structure],
+                                            ["Professionalism", station.breakdown.professionalism],
+                                            ["Pressure", station.followUpPressure],
+                                          ].map(([label, value]) => (
+                                            <div
+                                              key={`${station.questionId}-${label}`}
+                                              className="rounded-2xl bg-slate-50 p-3 text-center"
+                                            >
+                                              <p className="text-xs font-medium text-slate-500">
+                                                {label}
+                                              </p>
+                                              <p className="mt-1 text-sm font-bold text-slate-900">
+                                                {value}
+                                              </p>
+                                            </div>
+                                          ))}
+                                        </div>
+
+                                        {station.topWeaknesses.length > 0 ? (
+                                          <div className="mt-4">
+                                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                              Top weaknesses
+                                            </p>
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                              {station.topWeaknesses.map((weakness) => (
+                                                <SoftBadge key={weakness} tone="amber">
+                                                  {weakness}
+                                                </SoftBadge>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ) : null}
+
+                                        {station.penaltiesApplied.length > 0 ? (
+                                          <div className="mt-4">
+                                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                              Penalties applied
+                                            </p>
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                              {station.penaltiesApplied.map((penalty) => (
+                                                <SoftBadge key={penalty} tone="rose">
+                                                  {penalty}
+                                                </SoftBadge>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : null}
+
+                                {arenaResult.pass && arenaResult.boss.level === 5 ? (
                                   <div className="mt-5 rounded-2xl border border-emerald-200 bg-white p-4">
                                     <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald-700">
                                       Champion cleared
