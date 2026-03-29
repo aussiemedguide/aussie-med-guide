@@ -14,7 +14,7 @@ const supabase = createClient(
 );
 
 type CompleteArenaBody = {
-  runId: number;
+  runId: number | string;
   response: string;
   title?: string;
 };
@@ -27,11 +27,42 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = (await req.json()) as CompleteArenaBody;
+    const rawBody = (await req.json()) as Partial<CompleteArenaBody>;
 
-    if (!body?.runId || !body?.response?.trim()) {
+    const runId =
+      typeof rawBody.runId === "string"
+        ? Number(rawBody.runId)
+        : rawBody.runId;
+
+    const response =
+      typeof rawBody.response === "string" ? rawBody.response.trim() : "";
+
+    if (!runId || Number.isNaN(runId)) {
       return NextResponse.json(
-        { error: "runId and response are required." },
+        {
+          error: "Invalid or missing runId.",
+          debug: {
+            receivedRunId: rawBody.runId ?? null,
+            receivedBodyKeys: Object.keys(rawBody ?? {}),
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!response) {
+      return NextResponse.json(
+        {
+          error: "Response is required.",
+          debug: {
+            receivedResponseType: typeof rawBody.response,
+            responseLength:
+              typeof rawBody.response === "string"
+                ? rawBody.response.length
+                : null,
+            receivedBodyKeys: Object.keys(rawBody ?? {}),
+          },
+        },
         { status: 400 }
       );
     }
@@ -39,35 +70,62 @@ export async function POST(req: Request) {
     const { data: run, error: runError } = await supabase
       .from("arena_runs")
       .select("*")
-      .eq("id", body.runId)
+      .eq("id", runId)
       .eq("clerk_user_id", userId)
       .maybeSingle();
 
-    if (runError || !run) {
+    if (runError) {
       return NextResponse.json(
-        { error: runError?.message || "Arena run not found." },
+        {
+          error: "Failed to load arena run.",
+          debug: { supabaseError: runError.message },
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!run) {
+      return NextResponse.json(
+        {
+          error: "Arena run not found.",
+          debug: { runId, userId },
+        },
         { status: 404 }
       );
     }
 
     if (run.result === "completed" || run.completed_at) {
       return NextResponse.json(
-        { error: "This arena run has already been completed." },
+        {
+          error: "This arena run has already been completed.",
+          debug: { runId, currentResult: run.result },
+        },
         { status: 409 }
       );
     }
 
-    const boss = getBossByLevel(run.boss_level);
+    const bossLevel =
+      typeof run.boss_level === "string"
+        ? Number(run.boss_level)
+        : run.boss_level;
+
+    const boss = getBossByLevel(bossLevel);
 
     if (!boss) {
       return NextResponse.json(
-        { error: "Boss config not found." },
+        {
+          error: "Boss config not found.",
+          debug: {
+            runBossLevel: run.boss_level,
+            parsedBossLevel: bossLevel,
+          },
+        },
         { status: 400 }
       );
     }
 
     const scored = scoreArenaResponse({
-      response: body.response.trim(),
+      response,
       boss,
     });
 
@@ -76,7 +134,7 @@ export async function POST(req: Request) {
     const { error: updateArenaError } = await supabase
       .from("arena_runs")
       .update({
-        response: body.response.trim(),
+        response,
         result: scored.result,
         vitals_awarded: vitalsAwarded,
         score_overall: scored.breakdown.overall,
@@ -88,12 +146,15 @@ export async function POST(req: Request) {
         feedback: scored.feedback,
         completed_at: new Date().toISOString(),
       })
-      .eq("id", body.runId)
+      .eq("id", runId)
       .eq("clerk_user_id", userId);
 
     if (updateArenaError) {
       return NextResponse.json(
-        { error: updateArenaError.message || "Failed to complete arena run." },
+        {
+          error: "Failed to update arena run.",
+          debug: { supabaseError: updateArenaError.message },
+        },
         { status: 500 }
       );
     }
@@ -106,9 +167,12 @@ export async function POST(req: Request) {
       .insert({
         clerk_user_id: userId,
         mode: boss.mode.toUpperCase(),
-        title: body.title?.trim() || `${boss.title} Arena Run`,
+        title:
+          typeof rawBody.title === "string" && rawBody.title.trim().length > 0
+            ? rawBody.title.trim()
+            : `${boss.title} Arena Run`,
         prompt: promptForAttempt,
-        response: body.response.trim(),
+        response,
         clarity: scored.breakdown.clarity,
         reasoning: scored.breakdown.reasoning,
         empathy: scored.breakdown.empathy,
@@ -127,9 +191,8 @@ export async function POST(req: Request) {
     if (attemptError) {
       return NextResponse.json(
         {
-          error:
-            attemptError.message ||
-            "Arena run completed but interview attempt failed to save.",
+          error: "Arena run completed but interview attempt failed to save.",
+          debug: { supabaseError: attemptError.message },
         },
         { status: 500 }
       );
@@ -142,9 +205,9 @@ export async function POST(req: Request) {
       p_reason: scored.pass
         ? `Beat ${boss.title}`
         : `Completed ${boss.title}`,
-      p_source_id: String(body.runId),
+      p_source_id: String(runId),
       p_metadata: {
-        runId: body.runId,
+        runId,
         bossLevel: boss.level,
         bossName: boss.title,
         pass: scored.pass,
@@ -154,8 +217,8 @@ export async function POST(req: Request) {
     if (awardError) {
       return NextResponse.json(
         {
-          error:
-            awardError.message || "Arena run scored but vitals awarding failed.",
+          error: "Arena run scored but vitals awarding failed.",
+          debug: { supabaseError: awardError.message },
         },
         { status: 500 }
       );
@@ -187,6 +250,11 @@ export async function POST(req: Request) {
     const message =
       error instanceof Error ? error.message : "Unexpected server error.";
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: message,
+      },
+      { status: 500 }
+    );
   }
 }
