@@ -1050,15 +1050,17 @@ function DetailTabs({ active, onChange }: { active: DetailTab; onChange: (tab: D
   ];
 
   return (
-    <div className="rounded-[18px] border border-slate-200 bg-slate-50 p-1">
-      <div className="grid grid-cols-4 gap-1">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-1">
+      <div className="flex gap-1 overflow-x-auto no-scrollbar">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => onChange(tab.key)}
             className={cx(
-              "rounded-xl px-3 py-2 text-sm font-semibold transition",
-              active === tab.key ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:bg-white/70 hover:text-slate-900"
+              "shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm",
+              active === tab.key
+                ? "bg-white text-slate-950 shadow-sm"
+                : "text-slate-500 hover:bg-white/70 hover:text-slate-900"
             )}
           >
             {tab.label}
@@ -1073,17 +1075,27 @@ function SchoolDetailPanel({ school, onClose }: { school: SchoolData; onClose: (
   const [tab, setTab] = useState<DetailTab>("overview");
 
   return (
-    <SoftCard className={cx("border-2 p-5", tacMeta[school.tac].border)}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
+    <SoftCard className={cx("border-2 p-4 sm:p-5", tacMeta[school.tac].border)}>
+      <div className="flex items-start justify-between gap-3 sm:gap-4">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-3xl font-black tracking-tight text-slate-950">{school.name}</h2>
-            <span className={cx("rounded-full px-3 py-1 text-xs font-bold shadow-sm", tacMeta[school.tac].pill)}>{tacMeta[school.tac].label}</span>
-            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">#{school.ranking} Ranking</span>
+            <h2 className="min-w-0 text-2xl font-black leading-tight tracking-tight text-slate-950 sm:text-3xl">
+              {school.name}
+            </h2>
+            <span className={cx("rounded-full px-3 py-1 text-[11px] font-bold shadow-sm sm:text-xs", tacMeta[school.tac].pill)}>
+              {tacMeta[school.tac].label}
+            </span>
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 sm:text-xs">
+              #{school.ranking} Ranking
+            </span>
           </div>
           <p className="mt-1 text-sm text-slate-500">{school.state}</p>
         </div>
-        <button onClick={onClose} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+
+        <button
+          onClick={onClose}
+          className="shrink-0 rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+        >
           <X className="h-5 w-5" />
         </button>
       </div>
@@ -1092,52 +1104,95 @@ function SchoolDetailPanel({ school, onClose }: { school: SchoolData; onClose: (
         <DetailTabs active={tab} onChange={setTab} />
       </div>
 
-      <div className="mt-5 space-y-4">
+      <div className="mt-4 space-y-4 sm:mt-5">
         {tab === "overview" && (
           <>
-            <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-              <div className="mb-2 flex items-center gap-2 text-slate-950"><BookOpen className="h-4 w-4" /><span className="font-bold">{school.program}</span></div>
-              <div className="flex flex-wrap gap-4 text-sm text-slate-600">
-                <span className="inline-flex items-center gap-1.5"><Clock3 className="h-4 w-4" />{school.duration}</span>
-                <span className="inline-flex items-center gap-1.5"><School className="h-4 w-4" />Code: {school.code}</span>
-                <span className="inline-flex items-center gap-1.5"><Users className="h-4 w-4" />{school.places} places</span>
-                <span className="inline-flex items-center gap-1.5"><Award className="h-4 w-4" />{school.scholarships} scholarships</span>
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-2 flex items-start gap-2 text-slate-950">
+                <BookOpen className="mt-0.5 h-4 w-4 shrink-0" />
+                <span className="text-base font-bold leading-snug sm:text-lg">{school.program}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-sm text-slate-600 sm:flex sm:flex-wrap sm:gap-4">
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock3 className="h-4 w-4 shrink-0" />
+                  {school.duration}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <School className="h-4 w-4 shrink-0" />
+                  Code: {school.code}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Users className="h-4 w-4 shrink-0" />
+                  {school.places} places
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Award className="h-4 w-4 shrink-0" />
+                  {school.scholarships} scholarships
+                </span>
               </div>
             </div>
 
-            <div className="rounded-[20px] border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-950">
-              <div className="flex items-start gap-2"><Info className="mt-0.5 h-4 w-4" /><p>{school.overviewNote}</p></div>
+            <div className="rounded-3xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-950">
+              <div className="flex items-start gap-2">
+                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                <p className="leading-6">{school.overviewNote}</p>
+              </div>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-[20px] border border-slate-200 bg-white p-4">
+              <div className="rounded-3xl border border-slate-200 bg-white p-4">
                 <p className="text-sm font-bold text-slate-950">Campuses</p>
-                <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">{school.campus}</div>
+                <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {school.campus}
+                </div>
+
                 {school.colleges?.length ? (
                   <>
                     <p className="mt-4 text-sm font-bold text-slate-950">Nearby Colleges</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {school.colleges.map((college) => (
-                        <span key={college} className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">{college}</span>
+                        <span
+                          key={college}
+                          className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-medium text-blue-700 sm:text-xs"
+                        >
+                          {college}
+                        </span>
                       ))}
                     </div>
                   </>
                 ) : null}
               </div>
 
-              <div className="rounded-[20px] border border-slate-200 bg-white p-4">
+              <div className="rounded-3xl border border-slate-200 bg-white p-4">
                 <p className="text-sm font-bold text-slate-950">Structural Overview</p>
                 <div className="mt-3 space-y-2 text-sm text-slate-700">
                   <p>Intake: {school.intakeSummary}</p>
                   <p>Model: {school.model}</p>
-                  <p>Competitiveness: <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold">{school.competitiveness}</span></p>
-                  {school.biomedPathway ? <p><span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700">Biomed Pathway</span></p> : null}
+                  <p>
+                    Competitiveness:{" "}
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold">
+                      {school.competitiveness}
+                    </span>
+                  </p>
+                  {school.biomedPathway ? (
+                    <p>
+                      <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700">
+                        Biomed Pathway
+                      </span>
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Link href={school.officialUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">
+              <Link
+                href={school.officialUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 sm:w-auto"
+              >
                 Learn More About {school.shortName}
                 <ExternalLink className="h-4 w-4" />
               </Link>
@@ -1147,45 +1202,63 @@ function SchoolDetailPanel({ school, onClose }: { school: SchoolData; onClose: (
 
         {tab === "entry" && (
           <>
-            <div className="rounded-[20px] border border-blue-300 bg-blue-50 p-4 text-sm font-semibold text-blue-900">
+            <div className="rounded-3xl border border-blue-300 bg-blue-50 p-4 text-sm font-semibold text-blue-900">
               {school.noUcat ? "No UCAT required for the standard route shown here" : "UCAT ANZ required"}
             </div>
-            <div className="grid gap-4 lg:grid-cols-3">
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[
                 { label: "Metropolitan", atar: school.metroAtar ?? "N/A", ucat: school.metroUcat ?? "N/A", tone: "bg-blue-50 border-blue-200 text-blue-900" },
                 { label: "Rural", atar: school.ruralAtar ?? "N/A", ucat: school.ruralUcat ?? "N/A", tone: "bg-emerald-50 border-emerald-200 text-emerald-900" },
                 { label: "International", atar: school.intlAtar ?? "N/A", ucat: school.intlUcat ?? "N/A", tone: "bg-violet-50 border-violet-200 text-violet-900" },
               ].map((item) => (
-                <div key={item.label} className={cx("rounded-[20px] border p-4", item.tone)}>
+                <div key={item.label} className={cx("rounded-3xl border p-4", item.tone)}>
                   <p className="font-semibold">{item.label}</p>
                   <p className="mt-3 text-sm">ATAR Required</p>
-                  <p className="text-4xl font-black tracking-tight">{item.atar}</p>
+                  <p className="text-3xl font-black tracking-tight sm:text-4xl">{item.atar}</p>
                   <p className="mt-3 text-sm">UCAT Required</p>
-                  <p className="text-2xl font-black tracking-tight">{item.ucat}</p>
+                  <p className="text-xl font-black tracking-tight sm:text-2xl">{item.ucat}</p>
                 </div>
               ))}
             </div>
-            <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
               <p className="font-bold text-slate-950">Application Process</p>
-              <p className="mt-2">{school.entryProcess}</p>
+              <p className="mt-2 leading-6">{school.entryProcess}</p>
             </div>
           </>
         )}
 
         {tab === "interview" && (
           <>
-            <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-              <div className="mb-3 flex items-center gap-2 text-slate-950"><Stethoscope className="h-4 w-4" /><span className="font-bold">Interview Format</span></div>
-              <div className="grid gap-3 lg:grid-cols-3">
-                <div className="rounded-xl border border-slate-200 bg-white p-3"><p className="text-xs font-medium text-slate-400">Format</p><p className="mt-1 font-semibold text-slate-950">{school.interviewFormat}</p></div>
-                <div className="rounded-xl border border-slate-200 bg-white p-3"><p className="text-xs font-medium text-slate-400">Stations</p><p className="mt-1 font-semibold text-slate-950">{school.stations ?? "TBC"}</p></div>
-                <div className="rounded-xl border border-slate-200 bg-white p-3"><p className="text-xs font-medium text-slate-400">Time</p><p className="mt-1 font-semibold text-slate-950">{school.stationTime ?? "TBC"}</p></div>
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-3 flex items-center gap-2 text-slate-950">
+                <Stethoscope className="h-4 w-4" />
+                <span className="font-bold">Interview Format</span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <p className="text-xs font-medium text-slate-400">Format</p>
+                  <p className="mt-1 font-semibold text-slate-950">{school.interviewFormat}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <p className="text-xs font-medium text-slate-400">Stations</p>
+                  <p className="mt-1 font-semibold text-slate-950">{school.stations ?? "TBC"}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3 sm:col-span-2 lg:col-span-1">
+                  <p className="text-xs font-medium text-slate-400">Time</p>
+                  <p className="mt-1 font-semibold text-slate-950">{school.stationTime ?? "TBC"}</p>
+                </div>
               </div>
             </div>
-            <div className="rounded-[20px] border border-emerald-300 bg-emerald-50 p-4">
+
+            <div className="rounded-3xl border border-emerald-300 bg-emerald-50 p-4">
               <p className="font-bold text-emerald-950">Common Assessment Areas</p>
               <ul className="mt-3 space-y-2 text-sm text-emerald-950">
-                {school.interviewAreas.length ? school.interviewAreas.map((area) => <li key={area}>{area}</li>) : <li>No standard interview areas listed for this route.</li>}
+                {school.interviewAreas.length
+                  ? school.interviewAreas.map((area) => <li key={area}>{area}</li>)
+                  : <li>No standard interview areas listed for this route.</li>}
               </ul>
             </div>
           </>
@@ -1193,15 +1266,23 @@ function SchoolDetailPanel({ school, onClose }: { school: SchoolData; onClose: (
 
         {tab === "rural" && (
           <>
-            <div className="rounded-[20px] border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-950">
-              <div className="flex items-start gap-2"><Trees className="mt-0.5 h-4 w-4" /><p>{school.ruralInfo}</p></div>
+            <div className="rounded-3xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-950">
+              <div className="flex items-start gap-2">
+                <Trees className="mt-0.5 h-4 w-4 shrink-0" />
+                <p className="leading-6">{school.ruralInfo}</p>
+              </div>
             </div>
-            <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
               <p className="font-bold text-slate-950">General Rural Eligibility</p>
               <ul className="mt-3 space-y-2 text-sm text-slate-700">
                 {school.ruralEligibility.map((item) => <li key={item}>{item}</li>)}
               </ul>
-              {school.ruralLocations ? <p className="mt-4 text-sm text-emerald-700">Rural / regional locations: {school.ruralLocations}</p> : null}
+              {school.ruralLocations ? (
+                <p className="mt-4 text-sm text-emerald-700">
+                  Rural / regional locations: {school.ruralLocations}
+                </p>
+              ) : null}
             </div>
           </>
         )}
