@@ -1198,14 +1198,14 @@ export default function ChooseYourUniPage() {
                         key={key}
                         onClick={() => setPathway(key)}
                         className={cx(
-                          "rounded-xl px-4 py-3 text-sm font-semibold transition",
+                          "min-w-0 rounded-xl px-2 py-2 text-xs font-semibold transition sm:px-4 sm:py-3 sm:text-sm",
                           pathway === key
                             ? "bg-white text-slate-950 shadow-sm"
                             : "text-slate-500 hover:bg-white/70 hover:text-slate-900"
                         )}
                       >
-                        <span className="inline-flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
+                        <span className="inline-flex min-w-0 items-center justify-center gap-1.5">
+                          <Icon className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
                           {pathwayLabel(key)}
                         </span>
                       </button>
@@ -1228,9 +1228,9 @@ export default function ChooseYourUniPage() {
                 {filteredUniversities.map((uni) => (
                   <div
                     key={uni.id}
-                    className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3"
+                    className="rounded-2xl bg-slate-50 px-4 py-3"
                   >
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span
                         className={cx(
                           "rounded-full px-3 py-1 text-xs font-bold shadow-sm",

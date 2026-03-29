@@ -1360,7 +1360,7 @@ function BodyIllustration({
   onSelectNode: (id: string) => void;
 }) {
   return (
-    <div className="relative mx-auto aspect-4/5 w-full max-w-180 overflow-hidden rounded-4xl border border-slate-200 bg-linear-to-b from-slate-50 via-white to-slate-100">
+    <div className="relative mx-auto aspect-4/5 w-full max-w-full overflow-hidden rounded-[28px] border border-slate-200 bg-linear-to-b from-slate-50 via-white to-slate-100 sm:max-w-180">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.10),transparent_26%),radial-gradient(circle_at_bottom,rgba(168,85,247,0.08),transparent_24%)]" />
       <div className="absolute inset-x-0 top-0 h-24 bg-linear-to-b from-white/70 to-transparent" />
 
@@ -1423,50 +1423,50 @@ function BodyIllustration({
             type="button"
           >
             <motion.div
-              animate={isActive ? { scale: [1, 1.08, 1] } : { scale: 1 }}
-              transition={{ duration: 1.8, repeat: Infinity }}
-              className="flex flex-col items-center gap-2"
-            >
-              <div
-                className={cx(
-                  "relative flex h-14 w-14 items-center justify-center rounded-full border text-white shadow-lg",
-                  isActive
-                    ? "border-white bg-slate-900"
-                    : "border-white/80 bg-slate-700 hover:bg-slate-900"
-                )}
-              >
-                <span className={cx("absolute inset-0 rounded-full bg-linear-to-r opacity-80 blur-md", node.glow)} />
-                <span className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full bg-slate-900">
-                  <Icon className="h-5 w-5" />
-                </span>
-              </div>
+  animate={isActive ? { scale: [1, 1.06, 1] } : { scale: 1 }}
+  transition={{ duration: 1.8, repeat: Infinity }}
+  className="flex flex-col items-center gap-1.5"
+>
+  <div
+    className={cx(
+      "relative flex h-10 w-10 items-center justify-center rounded-full border text-white shadow-lg sm:h-14 sm:w-14",
+      isActive
+        ? "border-white bg-slate-900"
+        : "border-white/80 bg-slate-700 hover:bg-slate-900"
+    )}
+  >
+    <span className={cx("absolute inset-0 rounded-full bg-linear-to-r opacity-80 blur-md", node.glow)} />
+    <span className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 sm:h-14 sm:w-14">
+      <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+    </span>
+  </div>
 
-              <div
-                className={cx(
-                  "rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] shadow-sm transition",
-                  isActive
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-200 bg-white/95 text-slate-700"
-                )}
-              >
-                {node.shortLabel}
-              </div>
-            </motion.div>
+  <div
+    className={cx(
+      "rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] shadow-sm transition sm:px-3 sm:text-[11px] sm:tracking-[0.18em]",
+      isActive
+        ? "border-slate-900 bg-slate-900 text-white"
+        : "border-slate-200 bg-white/95 text-slate-700"
+    )}
+  >
+    {node.shortLabel}
+  </div>
+</motion.div>
           </button>
         );
       })}
 
-      <div className="absolute bottom-4 left-4 right-4 rounded-[28px] border border-slate-200 bg-white/92 p-4 shadow-lg backdrop-blur">
-        <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr] md:items-center">
+      <div className="absolute bottom-3 left-3 right-3 rounded-3xl border border-slate-200 bg-white/92 p-3 shadow-lg backdrop-blur sm:bottom-4 sm:left-4 sm:right-4 sm:p-4">
+        <div className="grid gap-3 md:grid-cols-[1.1fr_0.9fr] md:items-center">
           <div className="flex items-start gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
               <Orbit className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-950">
+              <p className="text-xs font-bold text-slate-950 sm:text-sm">
                 Click a body area to reveal the connected specialties
               </p>
-              <p className="mt-1 text-sm leading-6 text-slate-600">
+              <p className="mt-1 text-xs leading-5 text-slate-600 sm:text-sm sm:leading-6">
                 The goal is not isolated prestige. It is seeing how one real patient moves through a network of teams.
               </p>
             </div>

@@ -1755,13 +1755,13 @@ export default function AccommodationClient({
 
           <div className="mt-6 grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
             <div>
-              <div className="flex items-start gap-4">
+              <div className="flex min-w-0 items-start gap-3">
                 <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-linear-to-br from-violet-500 to-fuchsia-500 text-white shadow-lg shadow-violet-200">
                   <BedDouble className="h-7 w-7" />
                 </div>
 
                 <div>
-                  <h1 className="text-4xl font-black tracking-[-0.04em] text-slate-950 sm:text-5xl">
+                  <h1 className="text-3xl font-black tracking-[-0.04em] text-slate-950 sm:text-5xl">
                     Student Accommodation
                   </h1>
                   <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
@@ -1815,7 +1815,7 @@ export default function AccommodationClient({
             </div>
           </div>
 
-          <div className="mt-8 inline-flex rounded-2xl border border-slate-200 bg-slate-100 p-1 shadow-sm">
+          <div className="mt-8 grid w-full grid-cols-3 gap-1 rounded-2xl border border-slate-200 bg-slate-100 p-1 shadow-sm">
             <TabButton
               active={activeTab === "compare"}
               label="Compare & Save"
@@ -2695,12 +2695,12 @@ function TabButton({
     <button
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2 rounded-xl px-4 py-2 text-sm",
-        active ? "bg-white shadow" : "text-slate-500"
+        "flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-2 py-3 text-center text-[11px] leading-tight sm:flex-row sm:gap-2 sm:px-4 sm:py-2 sm:text-sm",
+        active ? "bg-white shadow text-slate-900" : "text-slate-500"
       )}
     >
-      <Icon className="h-4 w-4" />
-      {label}
+      <Icon className="h-4 w-4 shrink-0" />
+      <span className="min-w-0 wrap-break-word">{label}</span>
     </button>
   );
 }
