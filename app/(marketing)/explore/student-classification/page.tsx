@@ -653,7 +653,7 @@ const bodyNodes: BodyNode[] = [
     links: [
       { label: "Explore Cardiology", href: "https://litfl.com/ecg-library/" },
       { label: "Explore Radiology", href: "https://radiopaedia.org/" },
-     ],
+    ],
   },
   {
     id: "lungs",
@@ -990,6 +990,368 @@ const bodyNodes: BodyNode[] = [
   },
 ];
 
+function cx(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
+}
+
+function ExternalButton({ href, label }: LinkItem) {
+  return (
+    <Link
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-50"
+    >
+      <span>{label}</span>
+      <ExternalLink className="h-4 w-4" />
+    </Link>
+  );
+}
+
+function SoftCard({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cx(
+        "rounded-3xl border border-slate-200 bg-white/90 shadow-lg shadow-slate-200/60 backdrop-blur",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function TeamPill({
+  career,
+  isActive = false,
+  onClick,
+}: {
+  career: Career;
+  isActive?: boolean;
+  onClick?: () => void;
+}) {
+  const Icon = career.icon;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold shadow-sm transition",
+        isActive
+          ? "border-slate-900 bg-slate-900 text-white"
+          : "border-slate-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-slate-300"
+      )}
+    >
+      <span
+        className={cx(
+          "flex h-8 w-8 items-center justify-center rounded-full",
+          isActive ? "bg-white/15" : career.bg
+        )}
+      >
+        <Icon className={cx("h-4 w-4", isActive ? "text-white" : career.accent)} />
+      </span>
+      <span>{career.title}</span>
+    </button>
+  );
+}
+
+function TimelineRail({ steps }: { steps: TimelineStep[] }) {
+  return (
+    <div className="space-y-4">
+      {steps.map((step, index) => {
+        const Icon = step.icon;
+        const isLast = index === steps.length - 1;
+
+        return (
+          <div key={step.label} className="relative flex gap-4">
+            <div className="relative flex w-10 shrink-0 justify-center">
+              <div className="z-10 flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <Icon className="h-4 w-4 text-slate-700" />
+              </div>
+              {!isLast && <div className="absolute top-10 h-[calc(100%+14px)] w-px bg-slate-200" />}
+            </div>
+
+            <div className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5">
+              <p className="font-semibold text-slate-900">{step.label}</p>
+              <p className="mt-1 text-sm leading-6 text-slate-600">{step.detail}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function BodyNodeMobileSelector({
+  activeNode,
+  onSelectNode,
+}: {
+  activeNode: BodyNode;
+  onSelectNode: (id: string) => void;
+}) {
+  return (
+    <div className="sm:hidden">
+      <div className="mb-3 rounded-2xl border border-slate-200 bg-white/92 p-3 shadow-sm">
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+          Select view
+        </p>
+        <p className="mt-1 text-sm font-semibold text-slate-900">
+          Tap a body area below to update the card
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {bodyNodes.map((node) => {
+          const Icon = node.icon;
+          const isActive = activeNode.id === node.id;
+
+          return (
+            <button
+              key={node.id}
+              type="button"
+              onClick={() => onSelectNode(node.id)}
+              className={cx(
+                "rounded-2xl border px-2 py-3 text-center shadow-sm transition",
+                isActive
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : "border-slate-200 bg-white text-slate-700"
+              )}
+            >
+              <div
+                className={cx(
+                  "mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full",
+                  isActive ? "bg-white/15" : "bg-slate-100"
+                )}
+              >
+                <Icon className={cx("h-4 w-4", isActive ? "text-white" : node.accent)} />
+              </div>
+              <span className="block text-[11px] font-bold uppercase tracking-[0.12em]">
+                {node.shortLabel}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function BodyIllustration({
+  activeNode,
+  onSelectNode,
+}: {
+  activeNode: BodyNode;
+  onSelectNode: (id: string) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <BodyNodeMobileSelector activeNode={activeNode} onSelectNode={onSelectNode} />
+
+      <div className="relative mx-auto hidden aspect-4/5 w-full max-w-full overflow-hidden rounded-3xl border border-slate-200 bg-linear-to-b from-slate-50 via-white to-slate-100 sm:block sm:max-w-180">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.10),transparent_26%),radial-gradient(circle_at_bottom,rgba(168,85,247,0.08),transparent_24%)]" />
+        <div className="absolute inset-x-0 top-0 h-24 bg-linear-to-b from-white/70 to-transparent" />
+
+        <div className="absolute left-4 top-4 rounded-2xl border border-slate-200 bg-white/88 px-4 py-3 shadow-sm backdrop-blur">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+            Selected focus
+          </p>
+          <p className="mt-1 text-sm font-semibold text-slate-900">{activeNode.label}</p>
+        </div>
+
+        <div className="absolute right-4 top-4 rounded-2xl border border-slate-200 bg-white/88 px-4 py-3 shadow-sm backdrop-blur">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+            View
+          </p>
+          <div className="mt-1 inline-flex items-center gap-2 text-sm font-semibold text-sky-700">
+            <Orbit className="h-4 w-4" />
+            Team-based map
+          </div>
+        </div>
+
+        <div className="absolute left-1/2 top-[11%] h-24 w-24 -translate-x-1/2 rounded-full border border-slate-300 bg-white shadow-md" />
+        <div className="absolute left-1/2 top-[22%] h-53 w-37.5 -translate-x-1/2 rounded-[84px] border border-slate-300 bg-white shadow-md" />
+        <div className="absolute left-[31%] top-[25%] h-43.5 w-9 rounded-full border border-slate-300 bg-white shadow-sm" />
+        <div className="absolute right-[31%] top-[25%] h-43.5 w-9 rounded-full border border-slate-300 bg-white shadow-sm" />
+        <div className="absolute left-[39.5%] top-[49%] h-56.25 w-10 rounded-full border border-slate-300 bg-white shadow-sm" />
+        <div className="absolute right-[39.5%] top-[49%] h-56.25 w-10 rounded-full border border-slate-300 bg-white shadow-sm" />
+
+        <div className="absolute left-1/2 top-[25%] h-77.5 w-1 -translate-x-1/2 rounded-full bg-linear-to-b from-sky-300 via-violet-300 to-slate-300 opacity-70" />
+        <div className="absolute left-1/2 top-[24%] h-70.5 w-38.5 -translate-x-1/2 rounded-[90px] border border-dashed border-slate-200" />
+        <div className="absolute left-1/2 top-[58%] h-46.5 w-30.5 -translate-x-1/2 rounded-[64px] border border-dashed border-slate-200" />
+
+        <div className="absolute left-1/2 top-[14%] h-28 w-28 -translate-x-1/2 rounded-full bg-violet-100 blur-3xl opacity-60" />
+        <div className="absolute left-1/2 top-[37%] h-32 w-32 -translate-x-1/2 rounded-full bg-rose-100 blur-3xl opacity-55" />
+        <div className="absolute left-1/2 top-[54%] h-36 w-36 -translate-x-1/2 rounded-full bg-amber-100 blur-3xl opacity-45" />
+        <div className="absolute left-[18%] top-[56%] h-28 w-28 rounded-full bg-pink-100 blur-3xl opacity-35" />
+        <div className="absolute right-[18%] top-[70%] h-28 w-28 rounded-full bg-cyan-100 blur-3xl opacity-30" />
+
+        <div className="absolute left-[9%] top-[29%] hidden rounded-2xl border border-slate-200 bg-white/85 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur md:block">
+          Multiple teams,
+          <br />
+          one patient
+        </div>
+
+        <div className="absolute right-[9%] top-[58%] hidden rounded-2xl border border-slate-200 bg-white/85 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur md:block">
+          Click the body
+          <br />
+          to shift focus
+        </div>
+
+        {bodyNodes.map((node) => {
+          const Icon = node.icon;
+          const isActive = activeNode.id === node.id;
+
+          return (
+            <button
+              key={node.id}
+              onClick={() => onSelectNode(node.id)}
+              className={cx("absolute z-20 transition", node.position)}
+              aria-label={node.label}
+              type="button"
+            >
+              <motion.div
+                animate={isActive ? { scale: [1, 1.06, 1] } : { scale: 1 }}
+                transition={{ duration: 1.8, repeat: Infinity }}
+                className="flex flex-col items-center gap-1.5"
+              >
+                <div
+                  className={cx(
+                    "relative flex h-12 w-12 items-center justify-center rounded-full border text-white shadow-lg md:h-14 md:w-14",
+                    isActive
+                      ? "border-white bg-slate-900"
+                      : "border-white/80 bg-slate-700 hover:bg-slate-900"
+                  )}
+                >
+                  <span
+                    className={cx(
+                      "absolute inset-0 rounded-full bg-linear-to-r opacity-80 blur-md",
+                      node.glow
+                    )}
+                  />
+                  <span className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 md:h-14 md:w-14">
+                    <Icon className="h-4 w-4 md:h-5 md:w-5" />
+                  </span>
+                </div>
+
+                <div
+                  className={cx(
+                    "rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] shadow-sm transition md:px-3 md:text-[11px] md:tracking-[0.18em]",
+                    isActive
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-200 bg-white/95 text-slate-700"
+                  )}
+                >
+                  {node.shortLabel}
+                </div>
+              </motion.div>
+            </button>
+          );
+        })}
+
+        <div className="absolute bottom-4 left-4 right-4 rounded-3xl border border-slate-200 bg-white/92 p-4 shadow-lg backdrop-blur">
+          <div className="grid gap-3 md:grid-cols-[1.1fr_0.9fr] md:items-center">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                <Orbit className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-950">
+                  Click a body area to reveal the connected specialties
+                </p>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  The goal is not isolated prestige. It is seeing how one real patient moves through a network of teams.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                  Focus now
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{activeNode.shortLabel}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                  Teams linked
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{activeNode.specialists.length}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white/92 p-3 shadow-sm sm:hidden">
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              Focus now
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{activeNode.shortLabel}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              Teams linked
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{activeNode.specialists.length}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModeToggle({
+  mode,
+  setMode,
+}: {
+  mode: CareerExplorerMode;
+  setMode: (mode: CareerExplorerMode) => void;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-slate-50/90 p-2 shadow-inner">
+      <div className="grid grid-cols-2 gap-2">
+        {[
+          { key: "body", label: "Explore by Body" },
+          { key: "disease", label: "Explore by Disease" },
+        ].map((item) => {
+          const isActive = item.key === mode;
+
+          return (
+            <button
+              key={item.key}
+              onClick={() => setMode(item.key as CareerExplorerMode)}
+              className={cx(
+                "relative overflow-hidden rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                isActive
+                  ? "bg-white text-slate-950 shadow-lg shadow-slate-200/60"
+                  : "text-slate-600 hover:bg-white/70 hover:text-slate-900"
+              )}
+              type="button"
+            >
+              {isActive && (
+                <motion.span
+                  layoutId="career-mode-pill"
+                  className="absolute inset-0 rounded-2xl border border-slate-200 bg-white"
+                  transition={{ type: "spring", stiffness: 400, damping: 34 }}
+                />
+              )}
+              <span className="relative z-10">{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 const diseasePathways: DiseasePathway[] = [
   {
     id: "stroke",
@@ -1253,288 +1615,6 @@ const diseasePathways: DiseasePathway[] = [
   },
 ];
 
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
-
-function ExternalButton({ href, label }: LinkItem) {
-  return (
-    <Link
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-50"
-    >
-      <span>{label}</span>
-      <ExternalLink className="h-4 w-4" />
-    </Link>
-  );
-}
-
-function SoftCard({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cx(
-        "rounded-3xl border border-slate-200 bg-white/90 shadow-lg shadow-slate-200/60 backdrop-blur",
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function TeamPill({
-  career,
-  isActive = false,
-  onClick,
-}: {
-  career: Career;
-  isActive?: boolean;
-  onClick?: () => void;
-}) {
-  const Icon = career.icon;
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx(
-        "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold shadow-sm transition",
-        isActive
-          ? "border-slate-900 bg-slate-900 text-white"
-          : "border-slate-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-slate-300"
-      )}
-    >
-      <span
-        className={cx(
-          "flex h-8 w-8 items-center justify-center rounded-full",
-          isActive ? "bg-white/15" : career.bg
-        )}
-      >
-        <Icon className={cx("h-4 w-4", isActive ? "text-white" : career.accent)} />
-      </span>
-      <span>{career.title}</span>
-    </button>
-  );
-}
-
-function TimelineRail({ steps }: { steps: TimelineStep[] }) {
-  return (
-    <div className="space-y-4">
-      {steps.map((step, index) => {
-        const Icon = step.icon;
-        const isLast = index === steps.length - 1;
-
-        return (
-          <div key={step.label} className="relative flex gap-4">
-            <div className="relative flex w-10 shrink-0 justify-center">
-              <div className="z-10 flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <Icon className="h-4 w-4 text-slate-700" />
-              </div>
-              {!isLast && <div className="absolute top-10 h-[calc(100%+14px)] w-px bg-slate-200" />}
-            </div>
-
-            <div className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5">
-              <p className="font-semibold text-slate-900">{step.label}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-600">{step.detail}</p>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function BodyIllustration({
-  activeNode,
-  onSelectNode,
-}: {
-  activeNode: BodyNode;
-  onSelectNode: (id: string) => void;
-}) {
-  return (
-    <div className="relative mx-auto aspect-4/5 w-full max-w-full overflow-hidden rounded-[28px] border border-slate-200 bg-linear-to-b from-slate-50 via-white to-slate-100 sm:max-w-180">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.10),transparent_26%),radial-gradient(circle_at_bottom,rgba(168,85,247,0.08),transparent_24%)]" />
-      <div className="absolute inset-x-0 top-0 h-24 bg-linear-to-b from-white/70 to-transparent" />
-
-      <div className="absolute left-4 top-4 rounded-2xl border border-slate-200 bg-white/88 px-4 py-3 shadow-sm backdrop-blur">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-          Selected focus
-        </p>
-        <p className="mt-1 text-sm font-semibold text-slate-900">{activeNode.label}</p>
-      </div>
-
-      <div className="absolute right-4 top-4 rounded-2xl border border-slate-200 bg-white/88 px-4 py-3 shadow-sm backdrop-blur">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-          View
-        </p>
-        <div className="mt-1 inline-flex items-center gap-2 text-sm font-semibold text-sky-700">
-          <Orbit className="h-4 w-4" />
-          Team-based map
-        </div>
-      </div>
-
-      <div className="absolute left-1/2 top-[11%] h-24 w-24 -translate-x-1/2 rounded-full border border-slate-300 bg-white shadow-md" />
-      <div className="absolute left-1/2 top-[22%] h-53 w-37.5 -translate-x-1/2 rounded-[84px] border border-slate-300 bg-white shadow-md" />
-      <div className="absolute left-[31%] top-[25%] h-43.5 w-9 rounded-full border border-slate-300 bg-white shadow-sm" />
-      <div className="absolute right-[31%] top-[25%] h-43.5 w-9 rounded-full border border-slate-300 bg-white shadow-sm" />
-      <div className="absolute left-[39.5%] top-[49%] h-56.25 w-10 rounded-full border border-slate-300 bg-white shadow-sm" />
-      <div className="absolute right-[39.5%] top-[49%] h-56.25 w-10 rounded-full border border-slate-300 bg-white shadow-sm" />
-
-      <div className="absolute left-1/2 top-[25%] h-77.5 w-1 -translate-x-1/2 rounded-full bg-linear-to-b from-sky-300 via-violet-300 to-slate-300 opacity-70" />
-      <div className="absolute left-1/2 top-[24%] h-70.5 w-38.5 -translate-x-1/2 rounded-[90px] border border-dashed border-slate-200" />
-      <div className="absolute left-1/2 top-[58%] h-46.5 w-30.5 -translate-x-1/2 rounded-[64px] border border-dashed border-slate-200" />
-
-      <div className="absolute left-1/2 top-[14%] h-28 w-28 -translate-x-1/2 rounded-full bg-violet-100 blur-3xl opacity-60" />
-      <div className="absolute left-1/2 top-[37%] h-32 w-32 -translate-x-1/2 rounded-full bg-rose-100 blur-3xl opacity-55" />
-      <div className="absolute left-1/2 top-[54%] h-36 w-36 -translate-x-1/2 rounded-full bg-amber-100 blur-3xl opacity-45" />
-      <div className="absolute left-[18%] top-[56%] h-28 w-28 rounded-full bg-pink-100 blur-3xl opacity-35" />
-      <div className="absolute right-[18%] top-[70%] h-28 w-28 rounded-full bg-cyan-100 blur-3xl opacity-30" />
-
-      <div className="absolute left-[9%] top-[29%] hidden rounded-2xl border border-slate-200 bg-white/85 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur md:block">
-        Multiple teams,
-        <br />
-        one patient
-      </div>
-
-      <div className="absolute right-[9%] top-[58%] hidden rounded-2xl border border-slate-200 bg-white/85 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur md:block">
-        Click the body
-        <br />
-        to shift focus
-      </div>
-
-      {bodyNodes.map((node) => {
-        const Icon = node.icon;
-        const isActive = activeNode.id === node.id;
-
-        return (
-          <button
-            key={node.id}
-            onClick={() => onSelectNode(node.id)}
-            className={cx("absolute z-20 transition", node.position)}
-            aria-label={node.label}
-            type="button"
-          >
-            <motion.div
-  animate={isActive ? { scale: [1, 1.06, 1] } : { scale: 1 }}
-  transition={{ duration: 1.8, repeat: Infinity }}
-  className="flex flex-col items-center gap-1.5"
->
-  <div
-    className={cx(
-      "relative flex h-10 w-10 items-center justify-center rounded-full border text-white shadow-lg sm:h-14 sm:w-14",
-      isActive
-        ? "border-white bg-slate-900"
-        : "border-white/80 bg-slate-700 hover:bg-slate-900"
-    )}
-  >
-    <span className={cx("absolute inset-0 rounded-full bg-linear-to-r opacity-80 blur-md", node.glow)} />
-    <span className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 sm:h-14 sm:w-14">
-      <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-    </span>
-  </div>
-
-  <div
-    className={cx(
-      "rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] shadow-sm transition sm:px-3 sm:text-[11px] sm:tracking-[0.18em]",
-      isActive
-        ? "border-slate-900 bg-slate-900 text-white"
-        : "border-slate-200 bg-white/95 text-slate-700"
-    )}
-  >
-    {node.shortLabel}
-  </div>
-</motion.div>
-          </button>
-        );
-      })}
-
-      <div className="absolute bottom-3 left-3 right-3 rounded-3xl border border-slate-200 bg-white/92 p-3 shadow-lg backdrop-blur sm:bottom-4 sm:left-4 sm:right-4 sm:p-4">
-        <div className="grid gap-3 md:grid-cols-[1.1fr_0.9fr] md:items-center">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
-              <Orbit className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-950 sm:text-sm">
-                Click a body area to reveal the connected specialties
-              </p>
-              <p className="mt-1 text-xs leading-5 text-slate-600 sm:text-sm sm:leading-6">
-                The goal is not isolated prestige. It is seeing how one real patient moves through a network of teams.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                Focus now
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">{activeNode.shortLabel}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                Teams linked
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">{activeNode.specialists.length}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-function ModeToggle({
-  mode,
-  setMode,
-}: {
-  mode: CareerExplorerMode;
-  setMode: (mode: CareerExplorerMode) => void;
-}) {
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-slate-50/90 p-2 shadow-inner">
-      <div className="grid grid-cols-2 gap-2">
-        {[
-          { key: "body", label: "Explore by Body" },
-          { key: "disease", label: "Explore by Disease" },
-        ].map((item) => {
-          const isActive = item.key === mode;
-
-          return (
-            <button
-              key={item.key}
-              onClick={() => setMode(item.key as CareerExplorerMode)}
-              className={cx(
-                "relative overflow-hidden rounded-2xl px-4 py-3 text-sm font-semibold transition",
-                isActive
-                  ? "bg-white text-slate-950 shadow-lg shadow-slate-200/60"
-                  : "text-slate-600 hover:bg-white/70 hover:text-slate-900"
-              )}
-              type="button"
-            >
-              {isActive && (
-                <motion.span
-                  layoutId="career-mode-pill"
-                  className="absolute inset-0 rounded-2xl border border-slate-200 bg-white"
-                  transition={{ type: "spring", stiffness: 400, damping: 34 }}
-                />
-              )}
-              <span className="relative z-10">{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export default function StudentClassificationPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("categories");
   const [openId, setOpenId] = useState<string>("rural");
@@ -1563,15 +1643,20 @@ export default function StudentClassificationPage() {
   }, [search]);
 
   const activeNode = bodyNodes.find((node) => node.id === activeNodeId) ?? bodyNodes[0];
-  const activeDisease = diseasePathways.find((disease) => disease.id === activeDiseaseId) ?? diseasePathways[0];
+  const activeDisease =
+    diseasePathways.find((disease) => disease.id === activeDiseaseId) ?? diseasePathways[0];
 
   const linkedCareers = careers.filter((career) => activeNode.specialists.includes(career.id));
   const activeCareer =
-    careers.find((career) => career.id === activeCareerId && activeNode.specialists.includes(career.id)) ??
+    careers.find(
+      (career) => career.id === activeCareerId && activeNode.specialists.includes(career.id)
+    ) ??
     linkedCareers[0] ??
     null;
 
-  const diseaseLinkedCareers = careers.filter((career) => activeDisease.specialists.includes(career.id));
+  const diseaseLinkedCareers = careers.filter((career) =>
+    activeDisease.specialists.includes(career.id)
+  );
 
   const handleSelectNode = (nodeId: string) => {
     setActiveNodeId(nodeId);
@@ -1602,7 +1687,7 @@ export default function StudentClassificationPage() {
           </span>
         </div>
 
-        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-2xl shadow-slate-200/60 backdrop-blur sm:p-8">
+        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white/80 p-4 shadow-2xl shadow-slate-200/60 backdrop-blur sm:p-6 lg:p-8">
           <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-emerald-500 via-sky-500 to-violet-500" />
           <div className="absolute -right-20 -top-20 h-44 w-44 rounded-full bg-sky-100 blur-3xl" />
           <div className="absolute -left-20 bottom-0 h-44 w-44 rounded-full bg-violet-100 blur-3xl" />
@@ -1614,13 +1699,13 @@ export default function StudentClassificationPage() {
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br from-emerald-600 to-sky-600 text-white shadow-lg shadow-sky-200">
                     <MapPinned className="h-6 w-6" />
                   </div>
-                  <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-5xl">
+                  <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
                     Understanding Student Classification
                   </h1>
                 </div>
                 <p className="text-sm leading-7 text-slate-600 sm:text-base">
-                  How universities categorise applicants, how that changes competitiveness, and what it actually means
-                  for your medical admissions strategy.
+                  How universities categorise applicants, how that changes competitiveness, and what it
+                  actually means for your medical admissions strategy.
                 </p>
               </div>
             </div>
@@ -1635,7 +1720,7 @@ export default function StudentClassificationPage() {
                       key={tab.key}
                       onClick={() => setActiveTab(tab.key)}
                       className={cx(
-                        "relative overflow-hidden rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                        "relative overflow-hidden rounded-2xl px-3 py-3 text-sm font-semibold transition sm:px-4",
                         isActive
                           ? "bg-white text-slate-950 shadow-lg shadow-slate-200/60"
                           : "text-slate-600 hover:bg-white/70 hover:text-slate-900"
@@ -1670,10 +1755,13 @@ export default function StudentClassificationPage() {
                     <SoftCard className="border-emerald-200 bg-linear-to-r from-emerald-50 via-white to-sky-50 p-5">
                       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div>
-                          <h2 className="text-xl font-black tracking-tight text-slate-950">The order matters</h2>
+                          <h2 className="text-xl font-black tracking-tight text-slate-950">
+                            The order matters
+                          </h2>
                           <p className="mt-1 text-sm leading-7 text-slate-700">
-                            Start with rural, then metropolitan, then international. That order gives the clearest
-                            strategic picture because rural status can materially reshape competitiveness.
+                            Start with rural, then metropolitan, then international. That order gives the
+                            clearest strategic picture because rural status can materially reshape
+                            competitiveness.
                           </p>
                         </div>
                         <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm">
@@ -1695,7 +1783,7 @@ export default function StudentClassificationPage() {
                               className="w-full text-left"
                               type="button"
                             >
-                              <div className={cx("bg-linear-to-r px-5 py-5 text-white", category.gradient)}>
+                              <div className={cx("bg-linear-to-r px-4 py-5 text-white sm:px-5", category.gradient)}>
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="flex items-start gap-3">
                                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15 backdrop-blur">
@@ -1710,7 +1798,9 @@ export default function StudentClassificationPage() {
                                           {category.eyebrow}
                                         </span>
                                       </div>
-                                      <h3 className="text-2xl font-black tracking-tight">{category.title}</h3>
+                                      <h3 className="text-xl font-black tracking-tight sm:text-2xl">
+                                        {category.title}
+                                      </h3>
                                     </div>
                                   </div>
                                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 backdrop-blur">
@@ -1731,7 +1821,7 @@ export default function StudentClassificationPage() {
                                   transition={{ duration: 0.22 }}
                                   className="overflow-hidden"
                                 >
-                                  <div className="p-6">
+                                  <div className="p-5 sm:p-6">
                                     <div className="grid gap-6 xl:grid-cols-2">
                                       <div>
                                         <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
@@ -1799,7 +1889,7 @@ export default function StudentClassificationPage() {
                     {careerMode === "body" ? (
                       <SoftCard className="overflow-hidden border-slate-200">
                         <div className="grid items-start gap-0 xl:grid-cols-[1.18fr_0.82fr]">
-                          <div className="border-b border-slate-200 p-5 xl:border-b-0 xl:border-r xl:p-6">
+                          <div className="border-b border-slate-200 p-4 sm:p-5 xl:border-b-0 xl:border-r xl:p-6">
                             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                               <div>
                                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
@@ -1809,8 +1899,8 @@ export default function StudentClassificationPage() {
                                   Explore medicine through the human body
                                 </h2>
                                 <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
-                                  Click through major systems to see how real patient journeys stretch across teams,
-                                  referrals, procedures, follow-up, and continuity.
+                                  Click through major systems to see how real patient journeys stretch across
+                                  teams, referrals, procedures, follow-up, and continuity.
                                 </p>
                               </div>
 
@@ -1849,14 +1939,14 @@ export default function StudentClassificationPage() {
                                 </p>
                                 <p className="mt-2 text-sm leading-7 text-slate-700">
                                   <span className="font-semibold text-slate-900">{activeNode.shortLabel}</span> is a
-                                  good example of how medicine is rarely one-doctor care. It blends acute decisions,
-                                  long-term management, and handover between settings.
+                                  good example of how medicine is rarely one-doctor care. It blends acute
+                                  decisions, long-term management, and handover between settings.
                                 </p>
                               </div>
                             </div>
                           </div>
 
-                          <div className="p-5 xl:p-6">
+                          <div className="p-4 sm:p-5 xl:p-6">
                             <AnimatePresence mode="wait">
                               <motion.div
                                 key={activeNode.id}
@@ -1914,7 +2004,9 @@ export default function StudentClassificationPage() {
                                           activeCareer.bg
                                         )}
                                       >
-                                        <activeCareer.icon className={cx("h-5 w-5", activeCareer.accent)} />
+                                        <activeCareer.icon
+                                          className={cx("h-5 w-5", activeCareer.accent)}
+                                        />
                                       </div>
                                       <div>
                                         <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
@@ -1929,7 +2021,9 @@ export default function StudentClassificationPage() {
                                       </div>
                                     </div>
 
-                                    <p className="text-sm leading-7 text-slate-700">{activeCareer.description}</p>
+                                    <p className="text-sm leading-7 text-slate-700">
+                                      {activeCareer.description}
+                                    </p>
 
                                     <div className="mt-4 space-y-2">
                                       {activeCareer.subspecialties.map((sub) => (
@@ -1989,7 +2083,7 @@ export default function StudentClassificationPage() {
                         </div>
                       </SoftCard>
                     ) : (
-                      <SoftCard className="overflow-hidden border-slate-200 p-5">
+                      <SoftCard className="overflow-hidden border-slate-200 p-4 sm:p-5">
                         <div className="grid gap-6 xl:grid-cols-[0.42fr_0.58fr]">
                           <div>
                             <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
@@ -1999,8 +2093,8 @@ export default function StudentClassificationPage() {
                               See how one illness brings teams together
                             </h2>
                             <p className="mt-2 text-sm leading-7 text-slate-600">
-                              Students often see specialties as separate boxes. Disease mode shows the opposite: real
-                              care moves across teams, settings, and time.
+                              Students often see specialties as separate boxes. Disease mode shows the opposite:
+                              real care moves across teams, settings, and time.
                             </p>
 
                             <div className="mt-5 space-y-3">
@@ -2027,9 +2121,7 @@ export default function StudentClassificationPage() {
                                           isActive ? "bg-white/15" : disease.bg
                                         )}
                                       >
-                                        <Icon
-                                          className={cx("h-5 w-5", isActive ? "text-white" : disease.accent)}
-                                        />
+                                        <Icon className={cx("h-5 w-5", isActive ? "text-white" : disease.accent)} />
                                       </div>
                                       <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
@@ -2037,7 +2129,9 @@ export default function StudentClassificationPage() {
                                           <span
                                             className={cx(
                                               "rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.16em]",
-                                              isActive ? "bg-white/15 text-white/90" : "bg-slate-100 text-slate-600"
+                                              isActive
+                                                ? "bg-white/15 text-white/90"
+                                                : "bg-slate-100 text-slate-600"
                                             )}
                                           >
                                             {disease.systemHint}
@@ -2151,7 +2245,7 @@ export default function StudentClassificationPage() {
                       </SoftCard>
                     )}
 
-                    <SoftCard className="p-5">
+                    <SoftCard className="p-4 sm:p-5">
                       <div className="mb-4 flex items-center gap-3">
                         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
                           <Search className="h-5 w-5" />
@@ -2181,7 +2275,7 @@ export default function StudentClassificationPage() {
                           const Icon = career.icon;
 
                           return (
-                            <SoftCard key={career.id} className="p-6">
+                            <SoftCard key={career.id} className="p-5 sm:p-6">
                               <div className="flex items-start gap-4">
                                 <div className={cx("flex h-12 w-12 items-center justify-center rounded-2xl", career.bg)}>
                                   <Icon className={cx("h-5 w-5", career.accent)} />
@@ -2195,7 +2289,9 @@ export default function StudentClassificationPage() {
                                       Training: {career.training}
                                     </span>
                                   </div>
-                                  <p className="mt-3 text-sm leading-7 text-slate-700">{career.description}</p>
+                                  <p className="mt-3 text-sm leading-7 text-slate-700">
+                                    {career.description}
+                                  </p>
                                 </div>
                               </div>
 
@@ -2243,10 +2339,10 @@ export default function StudentClassificationPage() {
                             This is the point students usually miss
                           </h3>
                           <p className="mt-2 text-sm leading-7 text-slate-700">
-                            No specialty exists in isolation. A patient is rarely just a heart, just a bone, or just a
-                            scan. Medicine is built around teams, transitions, referrals, procedures, follow-up,
-                            uncertainty, and continuity. The more students understand the network, the smarter their
-                            curiosity becomes.
+                            No specialty exists in isolation. A patient is rarely just a heart, just a bone, or
+                            just a scan. Medicine is built around teams, transitions, referrals, procedures,
+                            follow-up, uncertainty, and continuity. The more students understand the network, the
+                            smarter their curiosity becomes.
                           </p>
                           <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white px-4 py-2 text-sm font-semibold text-amber-700 shadow-sm">
                             <GraduationCap className="h-4 w-4" />
