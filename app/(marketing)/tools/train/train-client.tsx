@@ -1679,6 +1679,45 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
   }
 }
 
+  async function retryArenaRun() {
+    setArenaResult(null);
+    setArenaResponses([]);
+    setArenaDraftResponse("");
+    setArenaQuestionIndex(0);
+    committedTranscriptRef.current = "";
+
+    try {
+      const res = await fetch("/api/train/arena/start", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bossId: arenaSelectedBossId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to restart arena run.");
+      }
+
+      const nextSession = data.session as ArenaSessionPayload;
+
+      setArenaRunId(data.runId as number);
+      setArenaSession(nextSession);
+      setArenaResponses(new Array(nextSession.questions.length).fill(""));
+      setArenaDraftResponse("");
+      setArenaQuestionIndex(0);
+      setTimerSeconds(0);
+      setIsRunningTimer(true);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to restart arena run.");
+    }
+  }
+
   async function evaluateWithBackend(fullText: string) {
     if (!(currentPrompt || currentPanelPrompt)) return;
     if (!isPremium || !userId) return;
@@ -3745,6 +3784,25 @@ export default function TrainClient({ isPremium, userId }: TrainClientProps) {
                                     </p>
                                   </div>
                                 ) : null}
+
+                                <div className="mt-5 flex flex-wrap gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={retryArenaRun}
+                                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
+                                  >
+                                    <Crown className="h-4 w-4" />
+                                    Try again
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={resetArenaDraft}
+                                    className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700"
+                                  >
+                                    Reset
+                                  </button>
+                                </div>
                               </div>
                             ) : null}
                           </div>
